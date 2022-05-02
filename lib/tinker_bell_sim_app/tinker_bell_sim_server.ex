@@ -6,14 +6,26 @@ defmodule TinkerBellSimServer do
     {:ok, state}
   end
 
-  def handle_cast({:startworkterm, value}, state) do
-    GenServer.cast(Enum.at(state,1),{:sendstate, 0})
+  def handle_call(:startworkterm, _from, state) do
+    for times <- 0..4 do
+      workerstate = GenServer.call(Enum.at(state, times), :sendstate)
+      IO.inspect workerstate
+      #GenServer.call(Server, {:append_workerstate, workerstate, times})
+      state = state ++ workerstate
+    end
+    {:reply, state, state}
   end
 
   def handle_call({:append_pid, pid}, _from, state) do
-    {:reply, pid, [state | pid]}
+    {:reply, pid, state ++ [pid]}
   end
-
+"""
+  def handle_call({:append_workerstate, value, index}, _from, state) do
+    #Enum.at(state, index) = [Enum.at(state, index)] ++ value
+    {:reply, value, state}
+    {:reply, value, state ++ value}
+  end
+"""
   #Client API
   def start_link(state \\ []) do
     GenServer.start_link(__MODULE__, state, name: Server)
@@ -24,6 +36,6 @@ defmodule TinkerBellSimServer do
   end
 
   def startworkterm do
-    GenServer.cast(Server,{:startworkterm, 0})
+    GenServer.call(Server,:startworkterm)
   end
 end
