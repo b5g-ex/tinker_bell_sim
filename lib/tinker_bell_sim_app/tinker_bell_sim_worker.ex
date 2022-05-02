@@ -6,16 +6,13 @@ defmodule TinkerBellSimWorker do
     {:ok, calcpower}
   end
 
-  def handle_cast({:sendstate, value}, calcpower) do
-    send Server, {self(), calcpower}
+  def handle_cast({:sendstate, 0}, calcpower) do
+    IO.puts "cast to worker ok"
   end
 
   #Client API
-  def start_link(name,calcpower \\ []) do
-    GenServer.start_link(__MODULE__, calcpower, name: name)
+  def start_link(calcpower \\ []) do
+    GenServer.start_link(__MODULE__, calcpower)
   end
 
-  def getworkerstate(workername,servername) do
-    GenServer.cast(workername,{:randommessage, value // []})
-  end
 end
