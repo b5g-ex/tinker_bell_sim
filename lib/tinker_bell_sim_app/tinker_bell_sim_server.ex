@@ -9,10 +9,10 @@ defmodule TinkerBellSimServer do
   def handle_call(:startworkterm, _from, state) do
     for times <- 0..4 do
       workerstate = GenServer.call(Enum.at(Map.keys(state),times), :sendstate)
-      Map.get_and_update(state, Enum.at(Map.keys(state),times), fn current_state
-        -> {current_state, workerstate}
-      end)
+      IO.inspect workerstate
+      Map.update(state, Enum.at(Map.keys(state),times), 0, fn current_state -> workerstate end)
     end
+
     {:reply, state, state}
   end
 
@@ -30,7 +30,7 @@ defmodule TinkerBellSimServer do
     GenServer.start_link(__MODULE__, state, name: Server)
     for times <- 0..4 do
       {:ok, pid} = TinkerBellSimWorker.start_link(100 * (times+1))
-      GenServer.call(Server, {:append_workerinfo, pid, 100 * (times+1)})
+      GenServer.call(Server, {:append_workerinfo, pid, 200 * (times+1)})
     end
 
     GenServer.call(Server,:getstate)
@@ -39,6 +39,7 @@ defmodule TinkerBellSimServer do
 
   def startworkterm do
     GenServer.call(Server,:startworkterm)
+    GenServer.call(Server,:getstate)
   end
 
 end
