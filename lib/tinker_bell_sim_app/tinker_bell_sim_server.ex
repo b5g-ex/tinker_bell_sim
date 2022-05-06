@@ -8,34 +8,30 @@ defmodule TinkerBellSimServer do
 
   def handle_call(:startworkterm, _from, state) do
     for times <- 0..4 do
-      workerstate = GenServer.call(Enum.at(state, times), :sendstate)
-      IO.inspect workerstate
+      workerstate = GenServer.call(Enum.at(Enum.at(state, times),0), :sendstate)
+      #IO.inspect workerstate
       #GenServer.call(Server, {:append_workerstate, workerstate, times})
-      state = state ++ workerstate
+      #Enum.at(Enum.at(state, 0), times) = workerstate
     end
     {:reply, state, state}
   end
 
-  def handle_call({:append_pid, pid}, _from, state) do
-    {:reply, pid, state ++ [pid]}
+  def handle_call({:append_workerinfo, pid, calcpower}, _from, state) do
+    Map.put(state, pid, calcpower)
+    {:reply, state, state}
   end
-"""
-  def handle_call({:append_workerstate, value, index}, _from, state) do
-    #Enum.at(state, index) = [Enum.at(state, index)] ++ value
-    {:reply, value, state}
-    {:reply, value, state ++ value}
-  end
-"""
+
   #Client API
-  def start_link(state \\ []) do
+  def start_link(state \\ %{}) do
     GenServer.start_link(__MODULE__, state, name: Server)
-    for times <- 1..5 do
-      {:ok, pid} = TinkerBellSimWorker.start_link(times * 100)
-      GenServer.call(Server, {:append_pid, pid})
+    for times <- 0..4 do
+      {:ok, pid} = TinkerBellSimWorker.start_link(100 * (times+1))
+      GenServer.call(Server, {:append_workerinfo, pid, 100 * (times+1)})
     end
   end
 
   def startworkterm do
     GenServer.call(Server,:startworkterm)
   end
+
 end
