@@ -7,7 +7,6 @@ defmodule TinkerBellSimWorker do
   end
 
   def handle_call(:sendstate, _from, workerstate) do
-    #workerstate = [workerstate, :rand.uniform 50]
     {:reply, workerstate, workerstate}
   end
 
