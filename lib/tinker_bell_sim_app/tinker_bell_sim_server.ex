@@ -8,9 +8,9 @@ defmodule TinkerBellSimServer do
 
   def handle_call({:update_worker_state, id}, _from, state) do
     pid = Enum.at(Map.keys(state), id)
-    workerstate = GenServer.call(pid, :sendstate)
+    workerstate = GenServer.call(pid, :get_workerstate)
     IO.inspect workerstate
-    {:reply, state, Map.update(state, pid, 0, fn _ -> workerstate end)}
+    {:reply, state, Map.update(state, pid, 0, fn _ -> Map.get(workerstate,:calcpower) end)}
   end
 
   def handle_call({:append_workerinfo, pid, calcpower}, _from, state) do
@@ -28,8 +28,14 @@ defmodule TinkerBellSimServer do
     {:reply, state, state}
   end
 
-  def handle_call(:newtask, _from, state) do
-    {:reply, state, Map.update(state, :tasks, [], fn nowtasks -> nowtasks ++ [:rand.uniform 100] end)}
+  def handle_call(:let_workers_create_newtask, _from, state) do
+    for times <- 2..6 do
+      for tasknum <- 0..:rand.uniform 3 do
+        GenServer.call(elem(Map.keys(state),times),:newtask)
+      end
+      GenServer.call(elem(Map.keys(state),times),:get_workerstate)
+    end
+    {:reply, state, state}
   end
 
   def handle_call(:get_tasklist_length, _from, state) do
@@ -73,7 +79,8 @@ defmodule TinkerBellSimServer do
   def start_link(state \\ %{}) do
     GenServer.start_link(__MODULE__, state, name: Server)
     for times <- 0..4 do
-      {:ok, pid} = TinkerBellSimWorker.start_link(100 * (times+1))
+      {:ok, pid} = TinkerBellSimWorker.start_link(%{calcpower: 100 * (times+1)})
+      GenServer.call(pid, :create_tasklist)
       GenServer.call(Server, {:append_workerinfo, pid, 200 * (times+1)})
     end
 
@@ -93,8 +100,8 @@ defmodule TinkerBellSimServer do
   end
 
   def create_tasks do
-    for times <- 0..:rand.uniform 15 do
-      GenServer.call(Server,:newtask)
+    for times <- 2..6 do
+      GenServer.call(Server,:let_workers_create_newtask)
     end
     GenServer.call(Server,:getstate)
   end
