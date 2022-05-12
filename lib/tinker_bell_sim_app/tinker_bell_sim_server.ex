@@ -40,12 +40,6 @@ defmodule TinkerBellSimServer do
     {:reply, state, state}
   end
 
-  """
-  def handle_call({:get_tasks_from_workers, id}, _from, state) do
-    GenServer
-  end
-  """
-
   def handle_call(:get_tasklist_length, _from, state) do
     tasklist_length = state
       |> Map.fetch(:tasks)
@@ -75,7 +69,7 @@ defmodule TinkerBellSimServer do
     {assignedtask,tasklist} = List.pop_at(tasklist,0)
     IO.inspect {assignedtask,tasklist}
 
-    assignmap = Map.put_new(assignmap, assignedtask, pid)
+    assignmap = Map.update(assignmap, pid, [], fn nowtasks -> nowtasks ++ [assignedtask] end)
     state = %{state | tasks: tasklist}
     state = %{state | assignmap: assignmap}
     state = Map.update(state, pid, [], fn x -> x - elem(assignedtask,0) end)
