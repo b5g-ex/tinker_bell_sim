@@ -16,7 +16,12 @@ defmodule TinkerBellSimWorker do
   end
 
   def handle_call(:newtask, _from, workerstate) do
-    {:reply, workerstate, Map.update(workerstate, :tasks, [], fn nowtasks -> nowtasks ++ [:rand.uniform 100] end)}
+    newtask = {(:rand.uniform 100), self()}
+    workerstate = Map.update(workerstate, :tasks, [], fn nowtasks ->
+       nowtasks ++ [newtask]
+    end)
+    IO.inspect workerstate
+    {:reply, newtask, workerstate}
   end
 
   #Client API

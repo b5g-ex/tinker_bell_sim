@@ -10,7 +10,9 @@ defmodule TinkerBellSimServer do
     pid = Enum.at(Map.keys(state), id)
     workerstate = GenServer.call(pid, :get_workerstate)
     IO.inspect workerstate
-    {:reply, state, Map.update(state, pid, 0, fn _ -> Map.get(workerstate,:calcpower) end)}
+    state = Map.update(state, pid, 0, fn _ -> Map.get(workerstate,:calcpower) end)
+    state = Map.update(state, :tasks, 0, fn nowtasks -> nowtasks ++ Map.get(workerstate,:tasks) end)
+    {:reply, state, state}
   end
 
   def handle_call({:append_workerinfo, pid, calcpower}, _from, state) do
@@ -31,12 +33,18 @@ defmodule TinkerBellSimServer do
   def handle_call(:let_workers_create_newtask, _from, state) do
     for times <- 2..6 do
       for tasknum <- 0..:rand.uniform 3 do
-        GenServer.call(elem(Map.keys(state),times),:newtask)
+        GenServer.call(Enum.at(Map.keys(state),times),:newtask)
       end
-      GenServer.call(elem(Map.keys(state),times),:get_workerstate)
+      GenServer.call(Enum.at(Map.keys(state),times),:get_workerstate)
     end
     {:reply, state, state}
   end
+
+  """
+  def handle_call({:get_tasks_from_workers, id}, _from, state) do
+    GenServer
+  end
+  """
 
   def handle_call(:get_tasklist_length, _from, state) do
     tasklist_length = state
@@ -70,7 +78,7 @@ defmodule TinkerBellSimServer do
     assignmap = Map.put_new(assignmap, assignedtask, pid)
     state = %{state | tasks: tasklist}
     state = %{state | assignmap: assignmap}
-    state = Map.update(state, pid, [], fn x -> x - assignedtask end)
+    state = Map.update(state, pid, [], fn x -> x - elem(assignedtask,0) end)
 
     {:reply, state, state}
   end
@@ -100,10 +108,17 @@ defmodule TinkerBellSimServer do
   end
 
   def create_tasks do
+    GenServer.call(Server,:let_workers_create_newtask)
     for times <- 2..6 do
-      GenServer.call(Server,:let_workers_create_newtask)
+      GenServer.call(Server,{:update_worker_state, times})
     end
     GenServer.call(Server,:getstate)
+  end
+
+  def get_tasks_from_workers do
+    for times <- 2..6 do
+      GenServer.call(Server,{:get_tasks_from_workers, times})
+    end
   end
 
   def assign_tasks_greedy do
