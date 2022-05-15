@@ -60,20 +60,34 @@ defmodule TinkerBellSimServer do
       |> tl()
       |> tl()
       |> Enum.max()
-    IO.inspect max_calcpower
+    #IO.inspect max_calcpower
     pid = state
       |>Enum.find(fn {key, val} -> val == max_calcpower end)
       |>elem(0)
-    IO.inspect pid
+    #IO.inspect pid
 
     {assignedtask,tasklist} = List.pop_at(tasklist,0)
-    IO.inspect {assignedtask,tasklist}
+    #IO.inspect {assignedtask,tasklist}
 
     assignmap = Map.update(assignmap, pid, [], fn nowtasks -> nowtasks ++ [assignedtask] end)
     state = %{state | tasks: tasklist}
     state = %{state | assignmap: assignmap}
     state = Map.update(state, pid, [], fn x -> x - elem(assignedtask,0) end)
 
+    {:reply, state, state}
+  end
+
+  def handle_call({:initialize_assignmap,id}, _from, state) do
+    assignmap = Map.get(state,:assignmap)
+    assignmap = Map.update(assignmap, Enum.at(Map.keys(state),id), [], fn nowtasks -> nowtasks end)
+    state = %{state | assignmap: assignmap}
+    {:reply, state, state}
+  end
+
+  def handle_call(:let_workers_do_tasks, _from, state) do
+    for times <- 2..6 do
+      GenServer.call(Enum.at(Map.keys(state),times),{:do_tasks, Map.get(state,:assignmap)})
+    end
     {:reply, state, state}
   end
 
@@ -109,16 +123,21 @@ defmodule TinkerBellSimServer do
     GenServer.call(Server,:getstate)
   end
 
+"""
   def get_tasks_from_workers do
     for times <- 2..6 do
       GenServer.call(Server,{:get_tasks_from_workers, times})
     end
   end
+"""
 
   def assign_tasks_greedy do
 
+    for times <- 2..6 do
+      GenServer.call(Server, {:initialize_assignmap, times})
+    end
+
     assign_iteration = GenServer.call(Server,:get_tasklist_length)
-    IO.inspect assign_iteration
 
     for times <- 1..assign_iteration do
       GenServer.call(Server,:assign_tasks_greedy)
@@ -126,6 +145,10 @@ defmodule TinkerBellSimServer do
 
     GenServer.call(Server,:getstate)
 
+  end
+
+  def do_tasks do
+    GenServer.call(Server,:let_workers_do_tasks)
   end
 
 end

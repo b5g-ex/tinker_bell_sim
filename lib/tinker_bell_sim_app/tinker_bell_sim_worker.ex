@@ -24,6 +24,13 @@ defmodule TinkerBellSimWorker do
     {:reply, newtask, workerstate}
   end
 
+  def handle_call({:do_tasks,assignmap}, _from, workerstate) do
+    tasks = Map.get(assignmap,self())
+    Enum.each(tasks, fn x -> :timer.sleep(x) end) #ここでエラー？　tasksが[]の場合に対応していない
+    IO.inspect self()
+    {:reply, workerstate, workerstate}
+  end
+
   #Client API
   def start_link(workerstate \\ %{}) do
     GenServer.start_link(__MODULE__, workerstate)
