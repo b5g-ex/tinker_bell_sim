@@ -26,7 +26,7 @@ defmodule TinkerBellSimWorker do
 
   def handle_call({:do_tasks,assignmap}, _from, workerstate) do
     tasks = Map.get(assignmap,self())
-    Enum.each(tasks, fn x -> :timer.sleep(x) end) #ここでエラー？　tasksが[]の場合に対応していない
+    Enum.each(tasks, fn x -> :timer.sleep(elem(x,0)) end) #ここでエラー？　tasksが[]の場合に対応していない
     IO.inspect self()
     {:reply, workerstate, workerstate}
   end
