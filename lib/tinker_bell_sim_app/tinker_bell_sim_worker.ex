@@ -16,19 +16,20 @@ defmodule TinkerBellSimWorker do
   end
 
   def handle_call(:newtask, _from, workerstate) do
-    newtask = {(:rand.uniform 100), self()}
+    newtask = {(:rand.uniform 500), self()}
     workerstate = Map.update(workerstate, :tasks, [], fn nowtasks ->
        nowtasks ++ [newtask]
     end)
-    IO.inspect workerstate
+    #IO.inspect workerstate
     {:reply, newtask, workerstate}
   end
 
-  def handle_call({:do_tasks,assignmap}, _from, workerstate) do
+  def handle_cast({:do_tasks,assignmap}, workerstate) do
     tasks = Map.get(assignmap,self())
     Enum.each(tasks, fn x -> :timer.sleep(elem(x,0)) end) #ここでエラー？　tasksが[]の場合に対応していない
     IO.inspect self()
-    {:reply, workerstate, workerstate}
+    workerstate = Map.update(workerstate, :tasks, [], fn nowtasks -> [] end)
+    {:noreply, workerstate}
   end
 
   #Client API

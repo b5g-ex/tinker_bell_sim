@@ -79,14 +79,14 @@ defmodule TinkerBellSimServer do
 
   def handle_call({:initialize_assignmap,id}, _from, state) do
     assignmap = Map.get(state,:assignmap)
-    assignmap = Map.update(assignmap, Enum.at(Map.keys(state),id), [], fn nowtasks -> nowtasks end)
+    assignmap = Map.update(assignmap, Enum.at(Map.keys(state),id), [], fn nowtasks -> [] end)
     state = %{state | assignmap: assignmap}
     {:reply, state, state}
   end
 
   def handle_call(:let_workers_do_tasks, _from, state) do
     for times <- 2..6 do
-      GenServer.call(Enum.at(Map.keys(state),times),{:do_tasks, Map.get(state,:assignmap)})
+      GenServer.cast(Enum.at(Map.keys(state),times),{:do_tasks, Map.get(state,:assignmap)})
     end
     {:reply, state, state}
   end
@@ -95,16 +95,13 @@ defmodule TinkerBellSimServer do
   def start_link(state \\ %{}) do
     GenServer.start_link(__MODULE__, state, name: Server)
     for times <- 0..4 do
-      {:ok, pid} = TinkerBellSimWorker.start_link(%{calcpower: 100 * (times+1)})
+      {:ok, pid} = TinkerBellSimWorker.start_link(%{calcpower: 1000 * (times+1)})
       GenServer.call(pid, :create_tasklist)
-      GenServer.call(Server, {:append_workerinfo, pid, 200 * (times+1)})
+      GenServer.call(Server, {:append_workerinfo, pid, 2000 * (times+1)})
     end
 
     GenServer.call(Server,:create_assignmap_and_tasks)
     GenServer.call(Server,:getstate)
-
-    TinkerBellSimServer.startworkterm
-    TinkerBellSimServer.create_tasks
 
   end
 
@@ -112,7 +109,15 @@ defmodule TinkerBellSimServer do
     for times <- 2..6 do
       GenServer.call(Server,{:update_worker_state, times})
     end
-    GenServer.call(Server,:getstate)
+    IO.inspect GenServer.call(Server,:getstate)
+
+    TinkerBellSimServer.create_tasks
+    IO.inspect GenServer.call(Server,:getstate)
+    TinkerBellSimServer.assign_tasks_greedy
+    IO.inspect GenServer.call(Server,:getstate)
+    TinkerBellSimServer.do_tasks
+    #IO.inspect GenServer.call(Server,:getstate)
+
   end
 
   def create_tasks do
@@ -122,14 +127,6 @@ defmodule TinkerBellSimServer do
     end
     GenServer.call(Server,:getstate)
   end
-
-"""
-  def get_tasks_from_workers do
-    for times <- 2..6 do
-      GenServer.call(Server,{:get_tasks_from_workers, times})
-    end
-  end
-"""
 
   def assign_tasks_greedy do
 
