@@ -48,10 +48,14 @@ defmodule TinkerBellSimServer do
     {:reply, tasklist_length, state}
   end
 
-  def handle_call(:assign_tasks_greedy, _from, state) do
+  def handle_call(:assign_tasks_maxgreedy, _from, state) do
+
     tasklist = state
       |> Map.fetch(:tasks)
       |> elem(1)
+    {assignedtask,tasklist} = List.pop_at(tasklist,0)
+    #IO.inspect {assignedtask,tasklist}
+
     assignmap = state
       |> Map.fetch(:assignmap)
       |> elem(1)
@@ -66,8 +70,36 @@ defmodule TinkerBellSimServer do
       |>elem(0)
     #IO.inspect pid
 
+    assignmap = Map.update(assignmap, pid, [], fn nowtasks -> nowtasks ++ [assignedtask] end)
+    state = %{state | tasks: tasklist}
+    state = %{state | assignmap: assignmap}
+    state = Map.update(state, pid, [], fn x -> x - elem(assignedtask,0) end)
+
+    {:reply, state, state}
+  end
+
+  def handle_call(:assign_tasks_mingreedy, _from, state) do
+
+    tasklist = state
+      |> Map.fetch(:tasks)
+      |> elem(1)
     {assignedtask,tasklist} = List.pop_at(tasklist,0)
     #IO.inspect {assignedtask,tasklist}
+
+    assignmap = state
+      |> Map.fetch(:assignmap)
+      |> elem(1)
+    min_calcpower = state
+      |> Map.values()
+      |> tl()
+      |> tl()
+      |> Enum.filter(fn x -> x >= elem(assignedtask,0) end)
+      |> Enum.min()
+
+    pid = state
+      |>Enum.find(fn {key, val} -> val == min_calcpower end)
+      |>elem(0)
+    #IO.inspect pid
 
     assignmap = Map.update(assignmap, pid, [], fn nowtasks -> nowtasks ++ [assignedtask] end)
     state = %{state | tasks: tasklist}
@@ -97,7 +129,7 @@ defmodule TinkerBellSimServer do
     for times <- 0..4 do
       {:ok, pid} = TinkerBellSimWorker.start_link(%{calcpower: 1000 * (times+1)})
       GenServer.call(pid, :create_tasklist)
-      GenServer.call(Server, {:append_workerinfo, pid, 2000 * (times+1)})
+      GenServer.call(Server, {:append_workerinfo, pid, 1000 * (times+1)})
     end
 
     GenServer.call(Server,:create_assignmap_and_tasks)
@@ -105,7 +137,7 @@ defmodule TinkerBellSimServer do
 
   end
 
-  def startworkterm do
+  def startworkterm(algo \\ :maxgreedy) do
     for times <- 2..6 do
       GenServer.call(Server,{:update_worker_state, times})
     end
@@ -113,7 +145,7 @@ defmodule TinkerBellSimServer do
 
     TinkerBellSimServer.create_tasks
     IO.inspect GenServer.call(Server,:getstate)
-    TinkerBellSimServer.assign_tasks_greedy
+    TinkerBellSimServer.assign_tasks(algo)
     IO.inspect GenServer.call(Server,:getstate)
     TinkerBellSimServer.do_tasks
     #IO.inspect GenServer.call(Server,:getstate)
@@ -128,7 +160,7 @@ defmodule TinkerBellSimServer do
     GenServer.call(Server,:getstate)
   end
 
-  def assign_tasks_greedy do
+  def assign_tasks(algo) do
 
     for times <- 2..6 do
       GenServer.call(Server, {:initialize_assignmap, times})
@@ -136,8 +168,15 @@ defmodule TinkerBellSimServer do
 
     assign_iteration = GenServer.call(Server,:get_tasklist_length)
 
-    for times <- 1..assign_iteration do
-      GenServer.call(Server,:assign_tasks_greedy)
+    case algo do
+      :maxgreedy ->
+        for times <- 1..assign_iteration do
+          GenServer.call(Server,:assign_tasks_maxgreedy)
+        end
+      :mingreedy ->
+        for times <- 1..assign_iteration do
+          GenServer.call(Server,:assign_tasks_mingreedy)
+        end
     end
 
     GenServer.call(Server,:getstate)
