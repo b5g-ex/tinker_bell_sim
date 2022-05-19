@@ -109,6 +109,34 @@ defmodule TinkerBellSimServer do
     {:reply, state, state}
   end
 
+  def handle_call(:get_tasklist, _from, state) do
+    tasklist = state
+      |> Map.fetch(:tasks)
+      |> elem(1)
+    {:reply, tasklist, state}
+  end
+
+  def handle_call({:assign_tasks_roundrobin, tasklist, i}, _from, state) do
+
+    assignedtask = Enum.at(tasklist,i)
+
+    assignmap = state
+      |> Map.fetch(:assignmap)
+      |> elem(1)
+
+    pid = state
+      |>Map.keys()
+      |>Enum.at(rem(i, 5) + 2)
+    #IO.inspect pid
+
+    assignmap = Map.update(assignmap, pid, [], fn nowtasks -> nowtasks ++ [assignedtask] end)
+    state = %{state | tasks: []}
+    state = %{state | assignmap: assignmap}
+    state = Map.update(state, pid, [], fn x -> x - elem(assignedtask,0) end)
+
+    {:reply, state, state}
+  end
+
   def handle_call({:initialize_assignmap,id}, _from, state) do
     assignmap = Map.get(state,:assignmap)
     assignmap = Map.update(assignmap, Enum.at(Map.keys(state),id), [], fn nowtasks -> [] end)
@@ -170,12 +198,17 @@ defmodule TinkerBellSimServer do
 
     case algo do
       :maxgreedy ->
-        for times <- 1..assign_iteration do
+        for times <- 0..assign_iteration - 1 do
           GenServer.call(Server,:assign_tasks_maxgreedy)
         end
       :mingreedy ->
-        for times <- 1..assign_iteration do
+        for times <- 0..assign_iteration - 1 do
           GenServer.call(Server,:assign_tasks_mingreedy)
+        end
+      :roundrobin ->
+        tasklist = GenServer.call(Server,:get_tasklist)
+        for times <- 0..assign_iteration - 1 do
+          GenServer.call(Server,{:assign_tasks_roundrobin, tasklist, times})
         end
     end
 
