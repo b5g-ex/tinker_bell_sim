@@ -116,6 +116,20 @@ defmodule TinkerBellSimServer do
     {:reply, tasklist, state}
   end
 
+  def handle_call({:is_assignment_valid?, i}, _from, state) do
+    pid = state
+      |> Map.keys()
+      |> Enum.at(rem(i, 5) + 2)
+
+    tasklist = state
+      |> Map.fetch(:tasks)
+      |> elem(1)
+
+    {assignedtask,tasklist} = List.pop_at(tasklist,0)
+
+    {:reply, elem(assignedtask,0) <= Map.get(state,pid), state}
+  end
+
   def handle_call({:assign_tasks_roundrobin, i}, _from, state) do
 
     assignmap = state
@@ -132,10 +146,6 @@ defmodule TinkerBellSimServer do
       |> elem(1)
     {assignedtask,tasklist} = List.pop_at(tasklist,0)
     #IO.inspect {assignedtask,tasklist}
-
-    if elem(assignedtask,0) > Map.get(state,pid) do
-      {:reply, state, state}
-    end
 
     assignmap = Map.update(assignmap, pid, [], fn nowtasks -> nowtasks ++ [assignedtask] end)
     state = %{state | tasks: tasklist}
@@ -155,7 +165,7 @@ defmodule TinkerBellSimServer do
   def handle_call(:let_workers_do_tasks, _from, state) do
     for times <- 2..6 do
       #GenServer.cast(Enum.at(Map.keys(state),times),{:do_tasks, Map.get(state,:assignmap)})
-      GenServer,:cast,[Enum.at(Map.keys(state),times),{:do_tasks, Map.get(state,:assignmap)}]
+      GenServer.cast(Enum.at(Map.keys(state),times),{:do_tasks, Map.get(state,:assignmap)})
     end
     {:reply, state, state}
   end
@@ -215,9 +225,15 @@ defmodule TinkerBellSimServer do
           GenServer.call(Server,:assign_tasks_mingreedy)
         end
       :roundrobin ->
-        #tasklist = GenServer.call(Server,:get_tasklist)
-        for times <- 0..assign_iteration - 1 do
-          GenServer.call(Server,{:assign_tasks_roundrobin, times})
+        for times <- 0..assign_iteration * 5 do
+          tasklist = GenServer.call(Server,:get_tasklist)
+          if tasklist != [] do
+            flag = GenServer.call(Server,{:is_assignment_valid?, times})
+            IO.inspect flag
+            if flag == true do
+              GenServer.call(Server,{:assign_tasks_roundrobin, times})
+            end
+          end
         end
     end
 

@@ -25,10 +25,19 @@ defmodule TinkerBellSimWorker do
   end
 
   def handle_cast({:do_tasks,assignmap}, workerstate) do
+
+    t1 = :erlang.monotonic_time()
+
     tasks = Map.get(assignmap,self())
     Enum.each(tasks, fn x -> :timer.sleep(elem(x,0)) end)
-    IO.inspect self()
+
+    t2 = :erlang.monotonic_time()
+
+    time = :erlang.convert_time_unit(t2 - t1, :native, :microsecond)
+    IO.inspect [self(),time]
+
     workerstate = Map.update(workerstate, :tasks, [], fn nowtasks -> [] end)
+
     {:noreply, workerstate}
   end
 
