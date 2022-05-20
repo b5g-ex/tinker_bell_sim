@@ -31,7 +31,9 @@ defmodule TinkerBellSimServer do
   end
 
   def handle_call(:let_workers_create_newtask, _from, state) do
+    _ = :rand.seed(:exsss, 1000)
     for times <- 2..6 do
+      GenServer.call(Enum.at(Map.keys(state),times),{:set_randomseed, times})
       for tasknum <- 0..:rand.uniform 3 do
         GenServer.call(Enum.at(Map.keys(state),times),:newtask)
       end

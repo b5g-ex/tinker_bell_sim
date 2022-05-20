@@ -15,6 +15,11 @@ defmodule TinkerBellSimWorker do
     {:reply, workerstate, workerstate}
   end
 
+  def handle_call({:set_randomseed, seed}, _from, workerstate) do
+    _ = :rand.seed(:exsss, 200 * seed + seed)
+    {:reply, workerstate, workerstate}
+  end
+
   def handle_call(:newtask, _from, workerstate) do
     newtask = {(:rand.uniform 1000), self()}
     workerstate = Map.update(workerstate, :tasks, [], fn nowtasks ->
