@@ -16,7 +16,7 @@ defmodule TinkerBellSimWorker do
   end
 
   def handle_call({:set_randomseed, seed}, _from, workerstate) do
-    _ = :rand.seed(:exsss, 200 * seed + seed)
+    _ = :rand.seed(:exsss, 1400 * seed + seed)
     {:reply, workerstate, workerstate}
   end
 
