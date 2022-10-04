@@ -196,7 +196,7 @@ defmodule TinkerBellSimServer do
     IO.inspect GenServer.call(Server,:getstate)
     TinkerBellSimServer.assign_tasks(algo)
     IO.inspect GenServer.call(Server,:getstate)
-    TinkerBellSimServer.do_tasks
+    TinkerBellSimServer.deal_tasks
     #IO.inspect GenServer.call(Server,:getstate)
 
   end
@@ -243,7 +243,7 @@ defmodule TinkerBellSimServer do
 
   end
 
-  def do_tasks do
+  def deal_tasks do
     GenServer.call(Server,:let_workers_do_tasks)
   end
 
