@@ -164,7 +164,7 @@ defmodule TinkerBellSimServer do
     {:reply, state, state}
   end
 
-  def handle_call(:let_workers_do_tasks, _from, state) do
+  def handle_call(:let_workers_deal_tasks, _from, state) do
     for times <- 2..6 do
       #GenServer.cast(Enum.at(Map.keys(state),times),{:do_tasks, Map.get(state,:assignmap)})
       GenServer.cast(Enum.at(Map.keys(state),times),{:do_tasks, Map.get(state,:assignmap)})
@@ -244,7 +244,7 @@ defmodule TinkerBellSimServer do
   end
 
   def deal_tasks do
-    GenServer.call(Server,:let_workers_do_tasks)
+    GenServer.call(Server,:let_workers_deal_tasks)
   end
 
 end
