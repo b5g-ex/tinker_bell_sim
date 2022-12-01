@@ -1,3 +1,4 @@
+#エンジンサーバーに関するリソース情報の生成機能のみ
 defmodule GEServer do
   use GenServer
 
