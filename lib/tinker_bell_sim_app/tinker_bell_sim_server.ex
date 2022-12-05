@@ -99,8 +99,8 @@ defmodule TinkerBellSimServer do
       |> Enum.min()
 
     pid = state
-      |>Enum.find(fn {key, val} -> val == min_calcpower end)
-      |>elem(0)
+      |> Enum.find(fn {key, val} -> val == min_calcpower end)
+      |> elem(0)
     #IO.inspect pid
 
     assignmap = Map.update(assignmap, pid, [], fn nowtasks -> nowtasks ++ [assignedtask] end)

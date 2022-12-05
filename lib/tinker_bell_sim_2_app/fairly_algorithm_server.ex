@@ -16,7 +16,25 @@ defmodule FAServer do
   end
 
   def handle_call({:assign_algorithm, task}, _from, state) do
-    IO.inspect "assign_task"
+    #enginemapの更新をさせる
+    """バグあり
+    relaypids = Map.keys(state)
+    Enum.map(relaypids, fn relaypid -> GenServer.call(relaypid, :update_enginemap) end)
+    """
+    #assign先の決定
+    relaymaps = Map.values(state)
+    enginemaps = Enum.map(relaymaps, fn x -> Map.get(x, :enginemap) end)
+    integrated_enginemap = Enum.reduce(enginemaps, %{}, fn x, acc -> Map.merge(acc, x) end)
+
+    min_taskque_num = integrated_enginemap
+      |> Map.values()
+      |> Enum.min()
+    pid = integrated_enginemap
+      |> Enum.find(fn {key, val} -> val == min_taskque_num end)
+      |> elem(0)
+
+    IO.inspect(pid, label: "assigned engine")
+
     {:reply, state, state}
   end
 

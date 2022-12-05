@@ -25,10 +25,9 @@ defmodule GRServer do
   end
 
   def handle_call(:start_assigning, _from, state) do
-    state.devicemap
-    |> Map.keys()
-    |> Enum.map(fn pid -> GenServer.cast(pid, :taskflag_true)
-                          GenServer.cast(pid, :create_task) end)
+    devicepids = Map.keys(state.devicemap)
+    Enum.map(devicepids, fn pid -> GenServer.cast(pid, :taskflag_true)
+      GenServer.cast(pid, :create_task) end)
     {:reply, state, state}
   end
 
@@ -43,7 +42,16 @@ defmodule GRServer do
     waiting_tasks = state.waiting_tasks
     waiting_tasks = Map.put_new(waiting_tasks, devicepid, task)
     state = Map.update!(state, :waiting_tasks, fn now -> waiting_tasks end)
+
     GenServer.call(AlgoServer, {:assign_algorithm, task})
+
+    {:reply, state, state}
+  end
+
+  def handle_call(:update_enginemap, _from, state) do
+    enginepids = Map.keys(state.enginemap)
+    Enum.map(enginepids, fn enginepid -> GenServer.call(enginepid, :update_engineinfo) end)
+
     {:reply, state, state}
   end
 
