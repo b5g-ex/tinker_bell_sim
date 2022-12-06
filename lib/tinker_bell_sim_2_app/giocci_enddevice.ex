@@ -18,9 +18,10 @@ defmodule EndDevice do
   end
 
   def handle_cast(:create_task, state) do
-    :timer.sleep(:rand.uniform 10000)
+    :timer.sleep(:rand.uniform 1000)
     #create task ↓
     task = %{flops: :rand.uniform 100000}
+    IO.inspect(self(), label: "task request from Device")
     GenServer.call(state.relaypid, {:assign_request, self(), task})
     #create task ↑
     if state.taskflag do

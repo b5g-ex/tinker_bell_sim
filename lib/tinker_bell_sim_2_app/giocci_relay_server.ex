@@ -24,18 +24,18 @@ defmodule GRServer do
     {:reply, state, state}
   end
 
-  def handle_call(:start_assigning, _from, state) do
+  def handle_cast(:start_assigning, state) do
     devicepids = Map.keys(state.devicemap)
     Enum.map(devicepids, fn pid -> GenServer.cast(pid, :taskflag_true)
       GenServer.cast(pid, :create_task) end)
-    {:reply, state, state}
+    {:noreply, state}
   end
 
-  def handle_call(:stop_assigning, _from, state) do
+  def handle_cast(:stop_assigning, state) do
     state.devicemap
     |> Map.keys()
     |> Enum.map(fn pid -> GenServer.cast(pid, :taskflag_false) end)
-    {:reply, state, state}
+    {:noreply, state}
   end
 
   def handle_call({:assign_request, devicepid, task}, _from, state) do
@@ -48,20 +48,24 @@ defmodule GRServer do
     {:reply, state, state}
   end
 
-  def handle_call(:update_enginemap, _from, state) do
-    enginepids = Map.keys(state.enginemap)
-    Enum.map(enginepids, fn enginepid -> GenServer.call(enginepid, :update_engineinfo) end)
+  def handle_cast({:update_enginemap, enginepid, new_engineinfo}, state) do
 
-    {:reply, state, state}
+    now_enginemap = state.enginemap
+    new_enginemap = Map.update!(now_enginemap, enginepid, fn engineinfo -> new_engineinfo end)
+    state = Map.update!(state, :enginemap, fn x -> new_enginemap end)
+    GenServer.cast(AlgoServer, {:update_relaymap, self(), state})
+
+    {:noreply, state}
   end
 
   #client API
   def start_link(relayinfo \\ %{enginemap: %{}, devicemap: %{}, waiting_tasks: %{}}) do
     {:ok, mypid} = GenServer.start_link(__MODULE__, relayinfo)
     for times <- 0..2 do
-      {:ok, pid} = GEServer.start_link()
+      {:ok, pid} = GEServer.start_link(%{relaypid: mypid})
       engineinfo = GenServer.call(pid, :get_engineinfo)
       GenServer.call(mypid, {:append_engineinfo, pid, engineinfo})
+      GenServer.cast(pid, :update_engineinfo)
     end
     for times <- 0..2 do
       {:ok, pid} = EndDevice.start_link(%{taskflag: false, relaypid: mypid})

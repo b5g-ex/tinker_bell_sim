@@ -13,26 +13,30 @@ defmodule GEServer do
 
   def handle_call(:initialize_engineinfo, _from, state) do
 
-    taskque_num = :rand.uniform 10
+    taskque_num = :rand.uniform 100
     bandwidth = :rand.uniform 100000
     delay = :rand.uniform 100000
     jitter = :rand.uniform 100000
     packetloss = :rand.uniform 10
     fee = :rand.uniform 10000
-    state = %{taskque: taskque_num, RtE_bandwidth: bandwidth, RtE_delay: delay, RtE_jitter: jitter, RtE_packetloss: packetloss, fee: fee}
+    state = Map.merge(state, %{taskque: taskque_num, RtE_bandwidth: bandwidth, RtE_delay: delay, RtE_jitter: jitter, RtE_packetloss: packetloss, fee: fee})
 
     {:reply, state, state}
   end
 
-  def handle_call(:update_engineinfo, _from, state) do
+  def handle_cast(:update_engineinfo, state) do
 
-    state = Map.update!(state, :taskque, fn now -> :rand.uniform 10 end)
+    :timer.sleep(100)
+    state = Map.update!(state, :taskque, fn now -> :rand.uniform 100 end)
+    GenServer.cast(state.relaypid, {:update_enginemap, self(), state})
 
-    {:reply, state, state}
+    GenServer.cast(self(), :update_engineinfo)
+
+    {:noreply, state}
   end
 
   #Client API
-  def start_link(engineinfo \\ %{}) do
+  def start_link(engineinfo \\ %{relaypid: 0}) do
     {:ok, mypid} = GenServer.start_link(__MODULE__, engineinfo)
     GenServer.call(mypid, :initialize_engineinfo)
     {:ok, mypid}

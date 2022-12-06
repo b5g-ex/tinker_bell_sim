@@ -17,25 +17,34 @@ defmodule FAServer do
 
   def handle_call({:assign_algorithm, task}, _from, state) do
     #enginemapの更新をさせる
-    """バグあり
+"""
     relaypids = Map.keys(state)
+    IO.inspect relaypids
     Enum.map(relaypids, fn relaypid -> GenServer.call(relaypid, :update_enginemap) end)
-    """
+"""
     #assign先の決定
     relaymaps = Map.values(state)
     enginemaps = Enum.map(relaymaps, fn x -> Map.get(x, :enginemap) end)
     integrated_enginemap = Enum.reduce(enginemaps, %{}, fn x, acc -> Map.merge(acc, x) end)
+    #IO.inspect integrated_enginemap
 
     min_taskque_num = integrated_enginemap
       |> Map.values()
+      |> Enum.map(fn engineinfo -> Map.get(engineinfo, :taskque) end)
       |> Enum.min()
     pid = integrated_enginemap
-      |> Enum.find(fn {key, val} -> val == min_taskque_num end)
+      |> Enum.find(fn {key, val} -> Map.get(val, :taskque) == min_taskque_num end)
       |> elem(0)
 
     IO.inspect(pid, label: "assigned engine")
 
     {:reply, state, state}
+  end
+
+  def handle_cast({:update_relaymap, relaypid, new_relayinfo}, state) do
+    state = Map.update!(state, relaypid, fn relayinfo -> new_relayinfo end)
+    #IO.inspect "engineinfo updated"
+    {:noreply, state}
   end
 
   #Client API
@@ -52,7 +61,7 @@ defmodule FAServer do
   def start_assigning() do
     GenServer.call(AlgoServer, :get_relaymap)
     |> Map.keys()
-    |> Enum.map(fn pid -> GenServer.call(pid, :start_assigning) end)
+    |> Enum.map(fn pid -> GenServer.cast(pid, :start_assigning) end)
     {:ok}
   end
 
@@ -60,7 +69,7 @@ defmodule FAServer do
   def stop_assigning() do
     GenServer.call(AlgoServer, :get_relaymap)
     |> Map.keys()
-    |> Enum.map(fn pid -> GenServer.call(pid, :stop_assigning) end)
+    |> Enum.map(fn pid -> GenServer.cast(pid, :stop_assigning) end)
     {:ok}
   end
 
