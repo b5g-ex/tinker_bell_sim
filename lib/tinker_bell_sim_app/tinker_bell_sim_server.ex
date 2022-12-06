@@ -99,8 +99,8 @@ defmodule TinkerBellSimServer do
       |> Enum.min()
 
     pid = state
-      |>Enum.find(fn {key, val} -> val == min_calcpower end)
-      |>elem(0)
+      |> Enum.find(fn {key, val} -> val == min_calcpower end)
+      |> elem(0)
     #IO.inspect pid
 
     assignmap = Map.update(assignmap, pid, [], fn nowtasks -> nowtasks ++ [assignedtask] end)
@@ -164,7 +164,7 @@ defmodule TinkerBellSimServer do
     {:reply, state, state}
   end
 
-  def handle_call(:let_workers_do_tasks, _from, state) do
+  def handle_call(:let_workers_deal_tasks, _from, state) do
     for times <- 2..6 do
       #GenServer.cast(Enum.at(Map.keys(state),times),{:do_tasks, Map.get(state,:assignmap)})
       GenServer.cast(Enum.at(Map.keys(state),times),{:do_tasks, Map.get(state,:assignmap)})
@@ -196,7 +196,7 @@ defmodule TinkerBellSimServer do
     IO.inspect GenServer.call(Server,:getstate)
     TinkerBellSimServer.assign_tasks(algo)
     IO.inspect GenServer.call(Server,:getstate)
-    TinkerBellSimServer.do_tasks
+    TinkerBellSimServer.deal_tasks
     #IO.inspect GenServer.call(Server,:getstate)
 
   end
@@ -243,8 +243,10 @@ defmodule TinkerBellSimServer do
 
   end
 
-  def do_tasks do
-    GenServer.call(Server,:let_workers_do_tasks)
+  def deal_tasks do
+    GenServer.call(Server,:let_workers_deal_tasks)
   end
 
 end
+
+#commit comment
