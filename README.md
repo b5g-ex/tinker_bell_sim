@@ -2,6 +2,11 @@
 
 **TODO: Add description**
 
+1. 「iex -S mix」で起動します
+2. 「FAServer.start_link()」でAlgoServer,Device,Relay,Engineを表すプロセスが起動します
+3. 「FAServer.start_assigning()」でタスク生成を開始します
+4. 「FAServer.stop_assigning()」でタスク生成を開始します（現在、このコマンドから数秒経ってから停止する状態になっています）
+
 ## Installation
 
 If [available in Hex](https://hex.pm/docs/publish), the package can be installed
