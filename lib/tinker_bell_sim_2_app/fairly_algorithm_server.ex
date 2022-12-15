@@ -23,22 +23,20 @@ defmodule FAServer do
     Enum.map(relaypids, fn relaypid -> GenServer.call(relaypid, :update_enginemap) end)
 """
     #assign先の決定
-    relaymaps = Map.values(state)
-    enginemaps = Enum.map(relaymaps, fn x -> Map.get(x, :enginemap) end)
-    integrated_enginemap = Enum.reduce(enginemaps, %{}, fn x, acc -> Map.merge(acc, x) end)
-    #IO.inspect integrated_enginemap
+    clustermap = Map.update!(state, Map.keys(state), fn x -> Map.get(x, :clusterinfo) end) #これのkeyの書き方がまずい
 
-    min_taskque_num = integrated_enginemap
+    cluster_taskque_scores = Map.update!(clustermap, Map.keys(clustermap), fn x -> length(x.cluster_taskque) end) #これのkeyの書き方がまずい
+
+    min_taskque_num = cluster_taskque_scores
       |> Map.values()
-      |> Enum.map(fn engineinfo -> Map.get(engineinfo, :taskque) end)
       |> Enum.min()
-    pid = integrated_enginemap
-      |> Enum.find(fn {key, val} -> Map.get(val, :taskque) == min_taskque_num end)
+    pid = cluster_taskque_scores
+      |> Enum.find(fn {key, val} -> val == min_taskque_num end)
       |> elem(0)
 
-    IO.inspect(pid, label: "assigned engine")
+    IO.inspect(pid, label: "assigned cluster")
 
-    {:reply, state, state}
+    {:reply, pid, state}
   end
 
   def handle_cast({:update_relaymap, relaypid, new_relayinfo}, state) do

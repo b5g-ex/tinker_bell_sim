@@ -20,6 +20,15 @@ defmodule GRServer do
     {:reply, state, state}
   end
 
+  def handle_call(:update_clusterinfo, _from, state) do
+    cluster_taskque = state.enginemap
+      |> Map.values()
+      |> Enum.map(fn x -> Map.get(x, :taskque) end)
+      |> Enum.reduce([], fn x, acc -> x ++ acc end)
+    state = Map.update!(state, :clusterinfo, fn now -> %{cluster_taskque: cluster_taskque} end)
+    {:reply, state, state}
+  end
+
   def handle_call(:get_relayinfo, _from, state) do
     {:reply, state, state}
   end
@@ -43,9 +52,42 @@ defmodule GRServer do
     waiting_tasks = Map.put_new(waiting_tasks, devicepid, task)
     state = Map.update!(state, :waiting_tasks, fn now -> waiting_tasks end)
 
-    GenServer.call(AlgoServer, {:assign_algorithm, task})
+    assigned_cluster_pid = GenServer.call(AlgoServer, {:assign_algorithm, task})
+    if self() == assigned_cluster_pid do
+      engine_taskque_scores = state.enginemap
+        |> Map.update!(Map.keys(state.enginemap), fn x -> Map.get(state.enginemap, :taskque) end) #これのkeyの書き方がまずい
+        |> Map.update!(Map.keys(state.enginemap), fn x -> length(x) end) #これのkeyの書き方がまずい
+      min_taskque_num = engine_taskque_scores
+        |> Map.values()
+        |> Enum.min()
+      assigned_engine_pid = engine_taskque_scores
+        |> Enum.find(fn {key, val} -> val == min_taskque_num end)
+        |> elem(0)
+
+      GenServer.cast(assigned_engine_pid, {:assign_task_to_engine, task})
+
+    else
+      GenServer.cast(assigned_cluster_pid, {:assign_task_in_cluster,task})
+    end
 
     {:reply, state, state}
+  end
+
+  def handle_cast({:assign_task_in_cluster,task}, state) do
+    #クラスター内assignはタスクキュー数のみで決定
+    engine_taskque_scores = state.enginemap
+      |> Map.update!(Map.keys(state.enginemap), fn x -> Map.get(state.enginemap, :taskque) end) #これのkeyの書き方がまずい
+      |> Map.update!(Map.keys(state.enginemap), fn x -> length(x) end) #これのkeyの書き方がまずい
+    min_taskque_num = engine_taskque_scores
+      |> Map.values()
+      |> Enum.min()
+    assigned_engine_pid = engine_taskque_scores
+      |> Enum.find(fn {key, val} -> val == min_taskque_num end)
+      |> elem(0)
+
+    GenServer.cast(assigned_engine_pid, {:assign_task_to_engine, task})
+
+    {:noreply, state}
   end
 
   def handle_cast({:update_enginemap, enginepid, new_engineinfo}, state) do
@@ -53,13 +95,21 @@ defmodule GRServer do
     now_enginemap = state.enginemap
     new_enginemap = Map.update!(now_enginemap, enginepid, fn engineinfo -> new_engineinfo end)
     state = Map.update!(state, :enginemap, fn x -> new_enginemap end)
+
+    #update_clusterinfoをする
+    cluster_taskque = state.enginemap
+      |> Map.values()
+      |> Enum.map(fn x -> Map.get(x, :taskque) end)
+      |> Enum.reduce([], fn x, acc -> x ++ acc end)
+    state = Map.update!(state, :clusterinfo, fn now -> %{cluster_taskque: cluster_taskque} end)
+
     GenServer.cast(AlgoServer, {:update_relaymap, self(), state})
 
     {:noreply, state}
   end
 
   #client API
-  def start_link(relayinfo \\ %{enginemap: %{}, devicemap: %{}, waiting_tasks: %{}}) do
+  def start_link(relayinfo \\ %{enginemap: %{}, devicemap: %{}, clusterinfo: %{}, waiting_tasks: %{}}) do
     {:ok, mypid} = GenServer.start_link(__MODULE__, relayinfo)
     for times <- 0..2 do
       {:ok, pid} = GEServer.start_link(%{relaypid: mypid})
@@ -69,8 +119,9 @@ defmodule GRServer do
     end
     for times <- 0..2 do
       {:ok, pid} = EndDevice.start_link(%{taskflag: false, relaypid: mypid})
-      GenServer.call(mypid, {:append_deviceinfo, pid, %{}})
+      GenServer.call(mypid, {:append_deviceinfo, pid, %{taskflag: false, relaypid: mypid}})
     end
+    GenServer.call(mypid, :update_clusterinfo)
     {:ok, mypid}
   end
 end
