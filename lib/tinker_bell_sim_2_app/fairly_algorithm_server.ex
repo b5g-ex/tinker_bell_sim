@@ -23,12 +23,22 @@ defmodule FAServer do
     Enum.map(relaypids, fn relaypid -> GenServer.call(relaypid, :update_enginemap) end)
 """
     #assign先の決定
-    clustermap = Map.update!(state, Map.keys(state), fn x -> Map.get(x, :clusterinfo) end) #これのkeyの書き方がまずい
+    #clustermap = state
+    #clustermap
+    #  |> Map.keys()
+    #  |> Enum.map(fn key -> clustermap = Map.update!(clustermap, key, fn x -> Map.get(x, :clusterinfo) end) end)
+    clustermap = Enum.map(state, fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
+    #clustermap = Map.update!(state, Map.keys(state), fn x -> Map.get(x, :clusterinfo) end) #これのkeyの書き方がまずい
 
-    cluster_taskque_scores = Map.update!(clustermap, Map.keys(clustermap), fn x -> length(x.cluster_taskque) end) #これのkeyの書き方がまずい
+    #cluster_taskque_scores = clustermap
+    #cluster_taskque_scores
+    #  |> Map.keys()
+    #  |> Enum.map(fn key -> cluster_taskque_scores = Map.update!(clustermap, key, fn x -> length(x.cluster_taskque) end) end)
+    cluster_taskque_scores = Enum.map(clustermap, fn {key, val} -> {key, length(val.cluster_taskque)} end)
+    #cluster_taskque_scores = Map.update!(clustermap, Map.keys(clustermap), fn x -> length(x.cluster_taskque) end) #これのkeyの書き方がまずい
 
     min_taskque_num = cluster_taskque_scores
-      |> Map.values()
+      |> Enum.map(fn {key, val} -> val end)
       |> Enum.min()
     pid = cluster_taskque_scores
       |> Enum.find(fn {key, val} -> val == min_taskque_num end)

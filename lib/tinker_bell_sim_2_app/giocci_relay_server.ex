@@ -54,11 +54,12 @@ defmodule GRServer do
 
     assigned_cluster_pid = GenServer.call(AlgoServer, {:assign_algorithm, task})
     if self() == assigned_cluster_pid do
+      #クラスター内assignはタスクキュー数のみで決定
       engine_taskque_scores = state.enginemap
-        |> Map.update!(Map.keys(state.enginemap), fn x -> Map.get(state.enginemap, :taskque) end) #これのkeyの書き方がまずい
-        |> Map.update!(Map.keys(state.enginemap), fn x -> length(x) end) #これのkeyの書き方がまずい
+        |> Enum.map(fn {key, val} -> {key, Map.get(val, :taskque)} end)
+        |> Enum.map(fn {key, val} -> {key, length(val)} end)
       min_taskque_num = engine_taskque_scores
-        |> Map.values()
+        |> Enum.map(fn {key, val} -> val end)
         |> Enum.min()
       assigned_engine_pid = engine_taskque_scores
         |> Enum.find(fn {key, val} -> val == min_taskque_num end)
@@ -76,10 +77,10 @@ defmodule GRServer do
   def handle_cast({:assign_task_in_cluster,task}, state) do
     #クラスター内assignはタスクキュー数のみで決定
     engine_taskque_scores = state.enginemap
-      |> Map.update!(Map.keys(state.enginemap), fn x -> Map.get(state.enginemap, :taskque) end) #これのkeyの書き方がまずい
-      |> Map.update!(Map.keys(state.enginemap), fn x -> length(x) end) #これのkeyの書き方がまずい
+      |> Enum.map(fn {key, val} -> {key, Map.get(val, :taskque)} end)
+      |> Enum.map(fn {key, val} -> {key, length(val)} end)
     min_taskque_num = engine_taskque_scores
-      |> Map.values()
+      |> Enum.map(fn {key, val} -> val end)
       |> Enum.min()
     assigned_engine_pid = engine_taskque_scores
       |> Enum.find(fn {key, val} -> val == min_taskque_num end)

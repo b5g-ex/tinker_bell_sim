@@ -32,7 +32,29 @@ defmodule GEServer do
   def handle_cast(:update_engineinfo, state) do
 
     :timer.sleep(100)
-    state = Map.update!(state, :taskque, fn now -> now end) #head taskを100ms分減らす
+    flo_at_iter = round(state.hidden_parameter_flops * 0.1) #100msでの処理能力
+    que = case length(state.taskque) do
+      0 -> []
+      1 -> [hd] = state.taskque
+        if hd <= flo_at_iter do
+          []
+        else
+          [hd - flo_at_iter]
+        end
+      _ -> [hd | tl] = state.taskque
+        if hd <= flo_at_iter do
+          [tlhead | tltail] = tl
+          [tlhead + hd - flo_at_iter | tltail]
+        else
+          [hd - flo_at_iter | tl]
+        end
+    end
+    state = Map.update!(state, :taskque, fn x -> que end) #head taskを100ms分減らす
+    #[hdtask | tltask] = state.taskque
+    #if hdtask <= 0 do
+    #  [new_hdtask | new_tltask] = tltask
+    #  state = Map.update!(state, :taskque, fn now -> [new_hdtask + hdtask | new_tltask] end)
+    #end
     GenServer.cast(state.relaypid, {:update_enginemap, self(), state})
 
     GenServer.cast(self(), :update_engineinfo)
@@ -43,7 +65,7 @@ defmodule GEServer do
   def handle_cast({:assign_task_to_engine, task},state) do
 
     state = Map.update!(state, :taskque, fn x -> x ++ [task.flo] end)
-    IO.inspect state.taskque
+    IO.inspect({state.taskque, self()}, label: "engine taskque")
 
     {:noreply,state}
   end
