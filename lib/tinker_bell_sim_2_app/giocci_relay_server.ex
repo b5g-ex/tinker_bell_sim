@@ -68,7 +68,7 @@ defmodule GRServer do
       GenServer.cast(assigned_engine_pid, {:assign_task_to_engine, task})
 
     else
-      GenServer.cast(assigned_cluster_pid, {:assign_task_in_cluster,task})
+      GenServer.cast(assigned_cluster_pid, {:assign_task_in_cluster, task})
     end
 
     {:reply, state, state}
@@ -112,13 +112,13 @@ defmodule GRServer do
   #client API
   def start_link(relayinfo \\ %{enginemap: %{}, devicemap: %{}, clusterinfo: %{}, waiting_tasks: %{}}) do
     {:ok, mypid} = GenServer.start_link(__MODULE__, relayinfo)
-    for times <- 0..2 do
+    for times <- 0..:rand.uniform 4 do
       {:ok, pid} = GEServer.start_link(%{relaypid: mypid})
       engineinfo = GenServer.call(pid, :get_engineinfo)
       GenServer.call(mypid, {:append_engineinfo, pid, engineinfo})
       GenServer.cast(pid, :update_engineinfo)
     end
-    for times <- 0..2 do
+    for times <- 0..:rand.uniform 4 do
       {:ok, pid} = EndDevice.start_link(%{taskflag: false, relaypid: mypid})
       GenServer.call(mypid, {:append_deviceinfo, pid, %{taskflag: false, relaypid: mypid}})
     end

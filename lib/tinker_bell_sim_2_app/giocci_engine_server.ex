@@ -13,7 +13,7 @@ defmodule GEServer do
 
   def handle_call(:initialize_engineinfo, _from, state) do
 
-    flops = :rand.uniform 10000
+    flops = :rand.uniform 100000
     """
     engine to relay 通信特性はr-r通信路に比べて十分強い通信路を想定し、考慮しなくて良いものとする
     bandwidth = :rand.uniform 100000
@@ -24,7 +24,7 @@ defmodule GEServer do
     #fee = :rand.uniform 10000 engineの使用料金は未検討
 
     #state = Map.merge(state, %{taskque: taskque_num, RtE_bandwidth: bandwidth, RtE_delay: delay, RtE_jitter: jitter, RtE_packetloss: packetloss, fee: fee})
-    state = Map.merge(state, %{taskque: [100,200,300], hidden_parameter_flops: flops})
+    state = Map.merge(state, %{taskque: [], hidden_parameter_flops: flops})
 
     {:reply, state, state}
   end
