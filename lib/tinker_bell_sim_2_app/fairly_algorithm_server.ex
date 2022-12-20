@@ -20,13 +20,13 @@ defmodule FAServer do
       |> Enum.map(fn {key, val} -> {key, Map.get(val, :devicemap)} end)
       |> Enum.map(fn {key, val} -> {key, length(Map.values(val))} end)
       |> Enum.map(fn {key, val} -> if val == 0 do {key, False} else {key, True} end end)
-      |> Enum.reduce([], fn {key, val}, acc -> if val do acc ++ [key] end end)
+      |> Enum.reduce([], fn {key, val}, acc -> if val == True do acc ++ [key] else acc end end)
 
     engine_connected_relay = state
       |> Enum.map(fn {key, val} -> {key, Map.get(val, :enginemap)} end)
       |> Enum.map(fn {key, val} -> {key, length(Map.values(val))} end)
       |> Enum.map(fn {key, val} -> if val == 0 do {key, False} else {key, True} end end)
-      |> Enum.reduce([], fn {key, val}, acc -> if val do acc ++ [key] end end)
+      |> Enum.reduce([], fn {key, val}, acc -> if val == True do acc ++ [key] else acc end end)
 
     relaynetwork_bandwidth = device_connected_relay
       |> Enum.reduce(%{}, fn dcr_pid, acc -> Map.put_new(acc, dcr_pid, %{}) end)
@@ -54,7 +54,7 @@ defmodule FAServer do
           |> Map.delete(:relaynetwork_bandwidth)
           |> Map.delete(:relaynetwork_delay)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
-        cluster_taskque_num = Enum.map(clustermap, fn {key, val} -> {key, length(val.cluster_taskque)} end)
+        cluster_taskque_num = Enum.map(clustermap, fn {key, val} -> {key, if val.cluster_taskque == "no engine" do :infinity else length(val.cluster_taskque) end} end)
         min_taskque_cluster_pid = cluster_taskque_num
           |> Enum.min_by(fn {key, val} -> val end)
           |> elem(0)

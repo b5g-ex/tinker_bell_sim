@@ -25,7 +25,7 @@ defmodule GRServer do
       |> Map.values()
       |> Enum.map(fn x -> Map.get(x, :taskque) end)
       |> Enum.reduce([], fn x, acc -> x ++ acc end)
-    state = Map.update!(state, :clusterinfo, fn now -> %{cluster_taskque: cluster_taskque} end)
+    state = Map.update!(state, :clusterinfo, fn now -> if state.enginemap == %{} do %{cluster_taskque: "no engine"} else %{cluster_taskque: cluster_taskque} end end)
     {:reply, state, state}
   end
 
@@ -103,15 +103,21 @@ defmodule GRServer do
   #client API
   def start_link(relayinfo \\ %{enginemap: %{}, devicemap: %{}, clusterinfo: %{}}) do
     {:ok, mypid} = GenServer.start_link(__MODULE__, relayinfo)
-    for times <- 0..:rand.uniform 4 do
-      {:ok, pid} = GEServer.start_link(%{relaypid: mypid})
-      engineinfo = GenServer.call(pid, :get_engineinfo)
-      GenServer.call(mypid, {:append_engineinfo, pid, engineinfo})
-      GenServer.cast(pid, :update_engineinfo)
+    enginenum = :rand.uniform(3) - 1
+    if enginenum != 0 do
+      for times <- 1..enginenum do
+        {:ok, pid} = GEServer.start_link(%{relaypid: mypid})
+        engineinfo = GenServer.call(pid, :get_engineinfo)
+        GenServer.call(mypid, {:append_engineinfo, pid, engineinfo})
+        GenServer.cast(pid, :update_engineinfo)
+      end
     end
-    for times <- 0..:rand.uniform 4 do
-      {:ok, pid} = EndDevice.start_link(%{taskflag: false, relaypid: mypid})
-      GenServer.call(mypid, {:append_deviceinfo, pid, %{taskflag: false, relaypid: mypid}})
+    devicenum = :rand.uniform(3) - 1
+    if devicenum != 0 do
+      for times <- 0..:rand.uniform 4 do
+        {:ok, pid} = EndDevice.start_link(%{taskflag: false, relaypid: mypid})
+        GenServer.call(mypid, {:append_deviceinfo, pid, %{taskflag: false, relaypid: mypid}})
+      end
     end
     GenServer.call(mypid, :update_clusterinfo)
     {:ok, mypid}
