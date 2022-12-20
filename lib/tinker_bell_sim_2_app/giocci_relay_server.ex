@@ -48,21 +48,15 @@ defmodule GRServer do
   end
 
   def handle_call({:assign_request, devicepid, task}, _from, state) do
-    waiting_tasks = state.waiting_tasks
-    waiting_tasks = Map.put_new(waiting_tasks, devicepid, task)
-    state = Map.update!(state, :waiting_tasks, fn now -> waiting_tasks end)
 
-    assigned_cluster_pid = GenServer.call(AlgoServer, {:assign_algorithm, task})
+    assigned_cluster_pid = GenServer.call(AlgoServer, {:assign_algorithm, devicepid, self(), task})
     if self() == assigned_cluster_pid do
       #クラスター内assignはタスクキュー数のみで決定
       engine_taskque_scores = state.enginemap
         |> Enum.map(fn {key, val} -> {key, Map.get(val, :taskque)} end)
         |> Enum.map(fn {key, val} -> {key, length(val)} end)
-      min_taskque_num = engine_taskque_scores
-        |> Enum.map(fn {key, val} -> val end)
-        |> Enum.min()
       assigned_engine_pid = engine_taskque_scores
-        |> Enum.find(fn {key, val} -> val == min_taskque_num end)
+        |> Enum.min_by(fn {key, val} -> val end)
         |> elem(0)
 
       GenServer.cast(assigned_engine_pid, {:assign_task_to_engine, task})
@@ -79,11 +73,8 @@ defmodule GRServer do
     engine_taskque_scores = state.enginemap
       |> Enum.map(fn {key, val} -> {key, Map.get(val, :taskque)} end)
       |> Enum.map(fn {key, val} -> {key, length(val)} end)
-    min_taskque_num = engine_taskque_scores
-      |> Enum.map(fn {key, val} -> val end)
-      |> Enum.min()
     assigned_engine_pid = engine_taskque_scores
-      |> Enum.find(fn {key, val} -> val == min_taskque_num end)
+      |> Enum.min_by(fn {key, val} -> val end)
       |> elem(0)
 
     GenServer.cast(assigned_engine_pid, {:assign_task_to_engine, task})
@@ -110,7 +101,7 @@ defmodule GRServer do
   end
 
   #client API
-  def start_link(relayinfo \\ %{enginemap: %{}, devicemap: %{}, clusterinfo: %{}, waiting_tasks: %{}}) do
+  def start_link(relayinfo \\ %{enginemap: %{}, devicemap: %{}, clusterinfo: %{}}) do
     {:ok, mypid} = GenServer.start_link(__MODULE__, relayinfo)
     for times <- 0..:rand.uniform 4 do
       {:ok, pid} = GEServer.start_link(%{relaypid: mypid})

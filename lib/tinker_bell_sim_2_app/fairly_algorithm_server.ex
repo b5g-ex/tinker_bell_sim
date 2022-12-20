@@ -21,38 +21,64 @@ defmodule FAServer do
       |> Enum.map(fn {key, val} -> {key, length(Map.values(val))} end)
       |> Enum.map(fn {key, val} -> if val == 0 do {key, False} else {key, True} end end)
       |> Enum.reduce([], fn {key, val}, acc -> if val do acc ++ [key] end end)
-    IO.inspect device_connected_relay
+
     engine_connected_relay = state
       |> Enum.map(fn {key, val} -> {key, Map.get(val, :enginemap)} end)
       |> Enum.map(fn {key, val} -> {key, length(Map.values(val))} end)
       |> Enum.map(fn {key, val} -> if val == 0 do {key, False} else {key, True} end end)
       |> Enum.reduce([], fn {key, val}, acc -> if val do acc ++ [key] end end)
-    IO.inspect engine_connected_relay
+
+    relaynetwork_bandwidth = device_connected_relay
+      |> Enum.reduce(%{}, fn dcr_pid, acc -> Map.put_new(acc, dcr_pid, %{}) end)
+      |> Enum.map(fn {key, val} ->
+        {key, Enum.reduce(engine_connected_relay, %{}, fn ecr_pid, acc -> Map.put_new(acc, ecr_pid, if key == ecr_pid do 0 else 500 + :rand.uniform(500) end) end)} end)
+    relaynetwork_delay = device_connected_relay
+      |> Enum.reduce(%{}, fn dcr_pid, acc -> Map.put_new(acc, dcr_pid, %{}) end)
+      |> Enum.map(fn {key, val} ->
+        {key, Enum.reduce(engine_connected_relay, %{}, fn ecr_pid, acc -> Map.put_new(acc, ecr_pid, if key == ecr_pid do 0 else 5 + :rand.uniform(20) end) end)} end)
+
+    relaynetwork_bandwidth = Enum.reduce(relaynetwork_bandwidth, %{}, fn {key, val}, acc -> Map.put_new(acc, key, val) end)
+    relaynetwork_delay = Enum.reduce(relaynetwork_delay, %{}, fn {key, val}, acc -> Map.put_new(acc, key, val) end)
+
+    state = Map.put_new(state, :relaynetwork_bandwidth, relaynetwork_bandwidth)
+    state = Map.put_new(state, :relaynetwork_delay, relaynetwork_delay)
 
     {:reply, state, state}
   end
 
-  def handle_call({:assign_algorithm, task}, _from, state) do
+  def handle_call({:assign_algorithm, devicepid, device_connected_relaypid, task}, _from, state) do
 
     case task.algo do
       "taskque" ->
-        clustermap = Enum.map(state, fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
-        cluster_taskque_scores = Enum.map(clustermap, fn {key, val} -> {key, length(val.cluster_taskque)} end)
-        min_taskque_num = cluster_taskque_scores
-          |> Enum.map(fn {key, val} -> val end)
-          |> Enum.min()
-        pid = cluster_taskque_scores
-          |> Enum.find(fn {key, val} -> val == min_taskque_num end)
+        clustermap = state
+          |> Map.delete(:relaynetwork_bandwidth)
+          |> Map.delete(:relaynetwork_delay)
+          |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
+        cluster_taskque_num = Enum.map(clustermap, fn {key, val} -> {key, length(val.cluster_taskque)} end)
+        min_taskque_cluster_pid = cluster_taskque_num
+          |> Enum.min_by(fn {key, val} -> val end)
           |> elem(0)
 
-        IO.inspect(pid, label: "assigned cluster")
-        {:reply, pid, state}
+        IO.inspect(min_taskque_cluster_pid, label: "assigned cluster")
+        {:reply, min_taskque_cluster_pid, state}
 
       "delay" ->
-        {:reply, "error", state}
+        delaymap = Map.get(state.relaynetwork_delay, device_connected_relaypid)
+        min_delay_cluster_pid = delaymap
+          |> Enum.min_by(fn {key, val} -> val end)
+          |> elem(0)
+
+        IO.inspect(min_delay_cluster_pid, label: "assigned cluster")
+        {:reply, min_delay_cluster_pid, state}
 
       "bandwidth" ->
-        {:reply, "error", state}
+        bandwidthmap = Map.get(state.relaynetwork_bandwidth, device_connected_relaypid)
+        max_bandwidth_cluster_pid = bandwidthmap
+          |> Enum.max_by(fn {key, val} -> val end)
+          |> elem(0)
+
+        IO.inspect(max_bandwidth_cluster_pid, label: "assigned cluster")
+        {:reply, max_bandwidth_cluster_pid, state}
     end
 
   end
