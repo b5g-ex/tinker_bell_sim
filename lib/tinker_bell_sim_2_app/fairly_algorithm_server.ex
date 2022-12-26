@@ -59,7 +59,7 @@ defmodule FAServer do
           |> Enum.min_by(fn {key, val} -> val end)
           |> elem(0)
 
-        IO.inspect(min_taskque_cluster_pid, label: "assigned cluster")
+        #IO.inspect(min_taskque_cluster_pid, label: "assigned cluster")
         {:reply, min_taskque_cluster_pid, state}
 
       "delay" ->
@@ -68,7 +68,7 @@ defmodule FAServer do
           |> Enum.min_by(fn {key, val} -> val end)
           |> elem(0)
 
-        IO.inspect(min_delay_cluster_pid, label: "assigned cluster")
+        #IO.inspect(min_delay_cluster_pid, label: "assigned cluster")
         {:reply, min_delay_cluster_pid, state}
 
       "bandwidth" ->
@@ -77,7 +77,7 @@ defmodule FAServer do
           |> Enum.max_by(fn {key, val} -> val end)
           |> elem(0)
 
-        IO.inspect(max_bandwidth_cluster_pid, label: "assigned cluster")
+        #IO.inspect(max_bandwidth_cluster_pid, label: "assigned cluster")
         {:reply, max_bandwidth_cluster_pid, state}
     end
 

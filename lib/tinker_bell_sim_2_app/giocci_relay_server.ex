@@ -50,6 +50,7 @@ defmodule GRServer do
   def handle_call({:assign_request, devicepid, task}, _from, state) do
 
     assigned_cluster_pid = GenServer.call(AlgoServer, {:assign_algorithm, devicepid, self(), task})
+    IO.inspect({self(), assigned_cluster_pid}, label: "relay-to-relay")
     if self() == assigned_cluster_pid do
       #クラスター内assignはタスクキュー数のみで決定
       engine_taskque_scores = state.enginemap

@@ -13,9 +13,9 @@ defmodule GEServer do
 
   def handle_call(:initialize_engineinfo, _from, state) do
 
-    flops = :rand.uniform 100000
+    flops = :rand.uniform 20000
     """
-    engine to relay 通信特性はr-r通信路に比べて十分強い通信路を想定し、考慮しなくて良いものとする
+    engine to relay 通信特性はrelay to relay通信路に比べて十分強い通信路を想定し、考慮しなくて良いものとする
     bandwidth = :rand.uniform 100000
     delay = :rand.uniform 100000
     jitter = :rand.uniform 100000
@@ -65,7 +65,7 @@ defmodule GEServer do
   def handle_cast({:assign_task_to_engine, task},state) do
 
     state = Map.update!(state, :taskque, fn x -> x ++ [task.flo] end)
-    IO.inspect({state.taskque, self()}, label: "engine taskque")
+    IO.inspect({self(), state.taskque}, label: "assigned engine & taskque")
 
     {:noreply,state}
   end
