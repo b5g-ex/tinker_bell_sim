@@ -32,7 +32,7 @@ defmodule FAServer do
     relaynetwork_bandwidth = device_connected_relay
       |> Enum.reduce(%{}, fn dcr_pid, acc -> Map.put_new(acc, dcr_pid, %{}) end)
       |> Enum.map(fn {key, val} ->
-        {key, Enum.reduce(engine_connected_relay, %{}, fn ecr_pid, acc -> Map.put_new(acc, ecr_pid, if key == ecr_pid do [10000, 10000] else [500 + :rand.uniform(500), 500 + :rand.uniform(500)] end) end)} end)
+        {key, Enum.reduce(engine_connected_relay, %{}, fn ecr_pid, acc -> Map.put_new(acc, ecr_pid, if key == ecr_pid do [9999, 9999] else [500 + :rand.uniform(500), 500 + :rand.uniform(500)] end) end)} end)
     relaynetwork_delay = device_connected_relay
       |> Enum.reduce(%{}, fn dcr_pid, acc -> Map.put_new(acc, dcr_pid, %{}) end)
       |> Enum.map(fn {key, val} ->
