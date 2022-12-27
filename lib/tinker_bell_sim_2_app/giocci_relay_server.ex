@@ -25,7 +25,7 @@ defmodule GRServer do
       |> Map.values()
       |> Enum.map(fn x -> Map.get(x, :taskque) end)
       |> Enum.reduce([], fn x, acc -> x ++ acc end)
-    state = Map.update!(state, :clusterinfo, fn now -> if state.enginemap == %{} do %{cluster_taskque: "no engine"} else %{cluster_taskque: cluster_taskque} end end)
+    state = Map.update!(state, :clusterinfo, fn now -> if state.enginemap == %{} do %{cluster_taskque: "no engine", cluster_enginenum: 0} else %{cluster_taskque: cluster_taskque, cluster_enginenum: Enum.count(state.enginemap)} end end)
     {:reply, state, state}
   end
 
@@ -94,7 +94,7 @@ defmodule GRServer do
       |> Map.values()
       |> Enum.map(fn x -> Map.get(x, :taskque) end)
       |> Enum.reduce([], fn x, acc -> x ++ acc end)
-    state = Map.update!(state, :clusterinfo, fn now -> %{cluster_taskque: cluster_taskque} end)
+    state = Map.update!(state, :clusterinfo, fn now -> if state.enginemap == %{} do %{cluster_taskque: "no engine", cluster_enginenum: 0} else %{cluster_taskque: cluster_taskque, cluster_enginenum: Enum.count(state.enginemap)} end end)
 
     GenServer.cast(AlgoServer, {:update_relaymap, self(), state})
 
