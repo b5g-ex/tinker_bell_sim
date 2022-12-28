@@ -28,15 +28,14 @@ defmodule FAServer do
       |> Enum.map(fn {key, val} -> if val == 0 do {key, False} else {key, True} end end)
       |> Enum.reduce([], fn {key, val}, acc -> if val == True do acc ++ [key] else acc end end)
 
-    #上り下りのbandwidth, delayを決定
     relaynetwork_bandwidth = device_connected_relay
       |> Enum.reduce(%{}, fn dcr_pid, acc -> Map.put_new(acc, dcr_pid, %{}) end)
       |> Enum.map(fn {key, val} ->
-        {key, Enum.reduce(engine_connected_relay, %{}, fn ecr_pid, acc -> Map.put_new(acc, ecr_pid, if key == ecr_pid do [9999, 9999] else [500 + :rand.uniform(500), 500 + :rand.uniform(500)] end) end)} end)
+        {key, Enum.reduce(engine_connected_relay, %{}, fn ecr_pid, acc -> Map.put_new(acc, ecr_pid, if key == ecr_pid do 9999 else 500 + :rand.uniform(500) end) end)} end)
     relaynetwork_delay = device_connected_relay
       |> Enum.reduce(%{}, fn dcr_pid, acc -> Map.put_new(acc, dcr_pid, %{}) end)
       |> Enum.map(fn {key, val} ->
-        {key, Enum.reduce(engine_connected_relay, %{}, fn ecr_pid, acc -> Map.put_new(acc, ecr_pid, if key == ecr_pid do [0, 0] else [5 + :rand.uniform(20), 5 + :rand.uniform(20)] end) end)} end)
+        {key, Enum.reduce(engine_connected_relay, %{}, fn ecr_pid, acc -> Map.put_new(acc, ecr_pid, if key == ecr_pid do 0 else 5 + :rand.uniform(20) end) end)} end)
 
     relaynetwork_bandwidth = Enum.reduce(relaynetwork_bandwidth, %{}, fn {key, val}, acc -> Map.put_new(acc, key, val) end)
     relaynetwork_delay = Enum.reduce(relaynetwork_delay, %{}, fn {key, val}, acc -> Map.put_new(acc, key, val) end)
@@ -55,8 +54,8 @@ defmodule FAServer do
           |> Map.delete(:relaynetwork_bandwidth)
           |> Map.delete(:relaynetwork_delay)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
-        cluster_taskque_num_average = Enum.map(clustermap, fn {key, val} -> {key, if val.cluster_taskque == "no engine" do :infinity else length(val.cluster_taskque) / val.cluster_enginenum end} end)
-        min_taskque_cluster_pid = cluster_taskque_num_average
+        cluster_taskque_num = Enum.map(clustermap, fn {key, val} -> {key, if val.cluster_taskque == "no engine" do :infinity else length(val.cluster_taskque) end} end)
+        min_taskque_cluster_pid = cluster_taskque_num
           |> Enum.min_by(fn {key, val} -> val end)
           |> elem(0)
 
@@ -66,7 +65,7 @@ defmodule FAServer do
       "delay" ->
         delaymap = Map.get(state.relaynetwork_delay, device_connected_relaypid)
         min_delay_cluster_pid = delaymap
-          |> Enum.min_by(fn {key, val} -> Enum.sum(val) end)
+          |> Enum.min_by(fn {key, val} -> val end)
           |> elem(0)
 
         #IO.inspect(min_delay_cluster_pid, label: "assigned cluster")
@@ -75,11 +74,28 @@ defmodule FAServer do
       "bandwidth" ->
         bandwidthmap = Map.get(state.relaynetwork_bandwidth, device_connected_relaypid)
         max_bandwidth_cluster_pid = bandwidthmap
-          |> Enum.max_by(fn {key, val} -> Enum.min(val) end)
+          |> Enum.max_by(fn {key, val} -> val end)
           |> elem(0)
 
         #IO.inspect(max_bandwidth_cluster_pid, label: "assigned cluster")
         {:reply, max_bandwidth_cluster_pid, state}
+
+      "responsetime" ->
+        cluster_responsetime_in_cluster = state
+          |> Map.delete(:relaynetwork_bandwidth)
+          |> Map.delete(:relaynetwork_delay)
+          |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
+          |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time)} end)
+          |> Enum.map(fn {key, val} -> {key, elem(val, 0)} end)
+        delaymap = Map.get(state.relaynetwork_delay, device_connected_relaypid)
+        cluster_responsetime = cluster_responsetime_in_cluster
+          |> Enum.map(fn {key, val} -> if val == :infinity do {key, val} else {key, val + Map.get(delaymap, key)} end end)
+        IO.inspect cluster_responsetime
+        min_responsetime_cluster_pid = cluster_responsetime
+          |> Enum.min_by(fn {key, val} -> val end)
+          |> elem(0)
+
+        {:reply, min_responsetime_cluster_pid, state}
     end
 
   end

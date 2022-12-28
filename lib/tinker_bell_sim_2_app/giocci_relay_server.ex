@@ -20,13 +20,41 @@ defmodule GRServer do
     {:reply, state, state}
   end
 
+  def handle_call(:initialize_clusterinfo, _from, state) do
+    cluster_taskque = state.enginemap
+      |> Map.values()
+      |> Enum.map(fn x -> Map.get(x, :taskque) end)
+      |> Enum.reduce([], fn x, acc -> x ++ acc end)
+    state = Map.update!(state, :clusterinfo, fn now -> if state.enginemap == %{} do %{cluster_taskque: "no engine", cluster_enginenum: 0, cluster_response_time: {:infinity, []}} else %{cluster_taskque: cluster_taskque, cluster_enginenum: Enum.count(state.enginemap), cluster_response_time: {0,[]}} end end)
+    {:reply, state, state}
+  end
+
   def handle_call(:update_clusterinfo, _from, state) do
     cluster_taskque = state.enginemap
       |> Map.values()
       |> Enum.map(fn x -> Map.get(x, :taskque) end)
       |> Enum.reduce([], fn x, acc -> x ++ acc end)
-    state = Map.update!(state, :clusterinfo, fn now -> if state.enginemap == %{} do %{cluster_taskque: "no engine", cluster_enginenum: 0} else %{cluster_taskque: cluster_taskque, cluster_enginenum: Enum.count(state.enginemap)} end end)
+    new_clusterinfo = state
+      |> Map.get(:clusterinfo)
+      |> Map.update!(:cluster_taskque, fn now_taskque -> if now_taskque == "no engine" do "no engine" else cluster_taskque end end)
+    state = Map.update!(state, :clusterinfo, fn _ -> new_clusterinfo end)
     {:reply, state, state}
+  end
+
+  def handle_cast({:send_task_response_time_in_cluster, task_response_time_in_cluster}, state) do
+    new_clusterinfo = state
+      |> Map.get(:clusterinfo)
+      |> Map.update!(:cluster_response_time, fn {_, nowdata} ->
+        newdata = if length(nowdata) < 10 do
+          nowdata ++ [task_response_time_in_cluster]
+          else
+          [hd | tl] = nowdata
+          tl ++ [task_response_time_in_cluster]
+          end
+        new_response_time = Enum.sum(newdata) / length(newdata)
+        {new_response_time, newdata} end)
+    state = Map.update!(state, :clusterinfo, fn _ -> new_clusterinfo end)
+    {:noreply, state}
   end
 
   def handle_call(:get_relayinfo, _from, state) do
@@ -50,7 +78,7 @@ defmodule GRServer do
   def handle_call({:assign_request, devicepid, task}, _from, state) do
 
     assigned_cluster_pid = GenServer.call(AlgoServer, {:assign_algorithm, devicepid, self(), task})
-    IO.inspect({self(), assigned_cluster_pid}, label: "relay-to-relay")
+    #IO.inspect({self(), assigned_cluster_pid}, label: "relay-to-relay") 標準出力
     if self() == assigned_cluster_pid do
       #クラスター内assignはタスクキュー数のみで決定
       engine_taskque_scores = state.enginemap
@@ -94,7 +122,10 @@ defmodule GRServer do
       |> Map.values()
       |> Enum.map(fn x -> Map.get(x, :taskque) end)
       |> Enum.reduce([], fn x, acc -> x ++ acc end)
-    state = Map.update!(state, :clusterinfo, fn now -> if state.enginemap == %{} do %{cluster_taskque: "no engine", cluster_enginenum: 0} else %{cluster_taskque: cluster_taskque, cluster_enginenum: Enum.count(state.enginemap)} end end)
+    new_clusterinfo = state
+      |> Map.get(:clusterinfo)
+      |> Map.update!(:cluster_taskque, fn now_taskque -> if now_taskque == "no engine" do "no engine" else cluster_taskque end end)
+    state = Map.update!(state, :clusterinfo, fn _ -> new_clusterinfo end)
 
     GenServer.cast(AlgoServer, {:update_relaymap, self(), state})
 
@@ -120,7 +151,7 @@ defmodule GRServer do
         GenServer.call(mypid, {:append_deviceinfo, pid, %{taskflag: false, relaypid: mypid}})
       end
     end
-    GenServer.call(mypid, :update_clusterinfo)
+    GenServer.call(mypid, :initialize_clusterinfo)
     {:ok, mypid}
   end
 end
