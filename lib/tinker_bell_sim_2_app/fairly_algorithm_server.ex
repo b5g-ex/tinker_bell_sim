@@ -30,11 +30,11 @@ defmodule FAServer do
 
     relaynetwork_bandwidth = device_connected_relay
       |> Enum.reduce(%{}, fn dcr_pid, acc -> Map.put_new(acc, dcr_pid, %{}) end)
-      |> Enum.map(fn {key, val} ->
+      |> Enum.map(fn {key, _} ->
         {key, Enum.reduce(engine_connected_relay, %{}, fn ecr_pid, acc -> Map.put_new(acc, ecr_pid, if key == ecr_pid do 9999 else 500 + :rand.uniform(500) end) end)} end)
     relaynetwork_delay = device_connected_relay
       |> Enum.reduce(%{}, fn dcr_pid, acc -> Map.put_new(acc, dcr_pid, %{}) end)
-      |> Enum.map(fn {key, val} ->
+      |> Enum.map(fn {key, _} ->
         {key, Enum.reduce(engine_connected_relay, %{}, fn ecr_pid, acc -> Map.put_new(acc, ecr_pid, if key == ecr_pid do 0 else 5 + :rand.uniform(20) end) end)} end)
 
     relaynetwork_bandwidth = Enum.reduce(relaynetwork_bandwidth, %{}, fn {key, val}, acc -> Map.put_new(acc, key, val) end)
@@ -56,7 +56,7 @@ defmodule FAServer do
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
         cluster_taskque_num = Enum.map(clustermap, fn {key, val} -> {key, if val.cluster_taskque == "no engine" do :infinity else length(val.cluster_taskque) end} end)
         min_taskque_cluster_pid = cluster_taskque_num
-          |> Enum.min_by(fn {key, val} -> val end)
+          |> Enum.min_by(fn {_, val} -> val end)
           |> elem(0)
 
         #IO.inspect(min_taskque_cluster_pid, label: "assigned cluster")
@@ -65,7 +65,7 @@ defmodule FAServer do
       "delay" ->
         delaymap = Map.get(state.relaynetwork_delay, device_connected_relaypid)
         min_delay_cluster_pid = delaymap
-          |> Enum.min_by(fn {key, val} -> val end)
+          |> Enum.min_by(fn {_, val} -> val end)
           |> elem(0)
 
         #IO.inspect(min_delay_cluster_pid, label: "assigned cluster")
@@ -74,7 +74,7 @@ defmodule FAServer do
       "bandwidth" ->
         bandwidthmap = Map.get(state.relaynetwork_bandwidth, device_connected_relaypid)
         max_bandwidth_cluster_pid = bandwidthmap
-          |> Enum.max_by(fn {key, val} -> val end)
+          |> Enum.max_by(fn {_, val} -> val end)
           |> elem(0)
 
         #IO.inspect(max_bandwidth_cluster_pid, label: "assigned cluster")
@@ -92,7 +92,7 @@ defmodule FAServer do
           |> Enum.map(fn {key, val} -> if val == :infinity do {key, val} else {key, val + Map.get(delaymap, key)} end end)
         IO.inspect cluster_responsetime
         min_responsetime_cluster_pid = cluster_responsetime
-          |> Enum.min_by(fn {key, val} -> val end)
+          |> Enum.min_by(fn {_, val} -> val end)
           |> elem(0)
 
         {:reply, min_responsetime_cluster_pid, state}
@@ -101,7 +101,7 @@ defmodule FAServer do
   end
 
   def handle_cast({:update_relaymap, relaypid, new_relayinfo}, state) do
-    state = Map.update!(state, relaypid, fn relayinfo -> new_relayinfo end)
+    state = Map.update!(state, relaypid, fn _ -> new_relayinfo end)
     #IO.inspect "engineinfo updated"
     {:noreply, state}
   end
@@ -109,7 +109,7 @@ defmodule FAServer do
   #Client API
   def start_link(relaymap \\ %{}) do
     GenServer.start_link(__MODULE__, relaymap, name: AlgoServer)
-    for times <- 0..4 do
+    for _ <- 0..4 do
       {:ok, pid} = GRServer.start_link()
       relayinfo = GenServer.call(pid, :get_relayinfo)
       GenServer.call(AlgoServer, {:append_relayinfo, pid, relayinfo})

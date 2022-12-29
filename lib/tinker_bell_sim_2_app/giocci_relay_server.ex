@@ -9,14 +9,14 @@ defmodule GRServer do
   def handle_call({:append_engineinfo, pid, engineinfo}, _from, state) do
     now_enginemap = state.enginemap
     new_enginemap = Map.put_new(now_enginemap, pid, engineinfo)
-    state = Map.update!(state, :enginemap, fn now_enginemap -> new_enginemap end)
+    state = Map.update!(state, :enginemap, fn _ -> new_enginemap end)
     {:reply, state, state}
   end
 
   def handle_call({:append_deviceinfo, pid, deviceinfo}, _from, state) do
     now_devicemap = state.devicemap
     new_devicemap = Map.put_new(now_devicemap, pid, deviceinfo)
-    state = Map.update!(state, :devicemap, fn now_devicemap -> new_devicemap end)
+    state = Map.update!(state, :devicemap, fn _ -> new_devicemap end)
     {:reply, state, state}
   end
 
@@ -25,7 +25,7 @@ defmodule GRServer do
       |> Map.values()
       |> Enum.map(fn x -> Map.get(x, :taskque) end)
       |> Enum.reduce([], fn x, acc -> x ++ acc end)
-    state = Map.update!(state, :clusterinfo, fn now -> if state.enginemap == %{} do %{cluster_taskque: "no engine", cluster_enginenum: 0, cluster_response_time: {:infinity, []}} else %{cluster_taskque: cluster_taskque, cluster_enginenum: Enum.count(state.enginemap), cluster_response_time: {0,[]}} end end)
+    state = Map.update!(state, :clusterinfo, fn _ -> if state.enginemap == %{} do %{cluster_taskque: "no engine", cluster_enginenum: 0, cluster_response_time: {:infinity, []}} else %{cluster_taskque: cluster_taskque, cluster_enginenum: Enum.count(state.enginemap), cluster_response_time: {0,[]}} end end)
     {:reply, state, state}
   end
 
@@ -48,7 +48,7 @@ defmodule GRServer do
         newdata = if length(nowdata) < 10 do
           nowdata ++ [task_response_time_in_cluster]
           else
-          [hd | tl] = nowdata
+          [_ | tl] = nowdata
           tl ++ [task_response_time_in_cluster]
           end
         new_response_time = Enum.sum(newdata) / length(newdata)

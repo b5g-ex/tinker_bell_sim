@@ -79,7 +79,7 @@ defmodule GEServer do
 
   def handle_cast(:process_a_task, state) do
     if length(state.taskque) > 0 do
-      [hdtask | tltask] = state.taskque
+      [hdtask | _] = state.taskque
       process_hdtask = Task.async(fn -> :timer.sleep(round(hdtask / state.hidden_parameter_flops * 1000)); :ok end)
       Task.await(process_hdtask, :infinity)
       GenServer.cast(self(), :finish_processing_a_task)
@@ -88,12 +88,13 @@ defmodule GEServer do
   end
 
   def handle_cast(:finish_processing_a_task, state) do
-    [hdtask | tltask] = state.taskque
+    [_ | tltask] = state.taskque
     state = Map.update!(state, :taskque, fn _ -> tltask end)
     [hdtask_assigned_time | tltask_assigned_time] = state.task_assigned_time
     state = Map.update!(state, :task_assigned_time, fn _ -> tltask_assigned_time end)
     task_finished_time = :erlang.monotonic_time()
-    task_response_time_in_cluster = task_finished_time - hdtask_assigned_time
+    task_response_time_in_cluster = (task_finished_time - hdtask_assigned_time) / :math.pow(10,6)
+    #IO.inspect task_response_time_in_cluster
     GenServer.cast(state.relaypid, {:send_task_response_time_in_cluster, task_response_time_in_cluster})
     GenServer.cast(self(), :process_a_task)
     {:noreply, state}
