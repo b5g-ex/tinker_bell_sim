@@ -18,9 +18,9 @@ defmodule EndDevice do
   end
 
   def handle_cast(:create_task, state) do
-    :timer.sleep(:rand.uniform 2000)
+    :timer.sleep(2000 + :rand.uniform 2000)
     #create task ↓
-    task = %{flo: :rand.uniform(10000), algo: "responsetime"}
+    task = %{flo: 1000 + :rand.uniform(2000), algo: "responsetime", restime_limit: 1000}
     #IO.inspect(self(), label: "task request from Device") 標準出力
     GenServer.call(state.relaypid, {:assign_request, self(), task})
     #create task ↑

@@ -25,7 +25,12 @@ defmodule GRServer do
       |> Map.values()
       |> Enum.map(fn x -> Map.get(x, :taskque) end)
       |> Enum.reduce([], fn x, acc -> x ++ acc end)
-    state = Map.update!(state, :clusterinfo, fn _ -> if state.enginemap == %{} do %{cluster_taskque: "no engine", cluster_enginenum: 0, cluster_response_time: {:infinity, []}} else %{cluster_taskque: cluster_taskque, cluster_enginenum: Enum.count(state.enginemap), cluster_response_time: {0,[]}} end end)
+    #clusterの平均flopsから課金額を決定したい
+    cluster_flops_sum = state.enginemap
+      |> Map.values()
+      |> Enum.map(fn x -> Map.get(x, :hidden_parameter_flops) end)
+      |> Enum.reduce(0, fn x, acc -> x + acc end)
+    state = Map.update!(state, :clusterinfo, fn _ -> if state.enginemap == %{} do %{cluster_taskque: "no engine", cluster_enginenum: 0, cluster_response_time: {:infinity, []}, cluster_fee: :infinity} else %{cluster_taskque: cluster_taskque, cluster_enginenum: Enum.count(state.enginemap), cluster_response_time: {0,[]}, cluster_fee: (cluster_flops_sum / Enum.count(state.enginemap))} end end)
     {:reply, state, state}
   end
 
@@ -34,25 +39,27 @@ defmodule GRServer do
       |> Map.values()
       |> Enum.map(fn x -> Map.get(x, :taskque) end)
       |> Enum.reduce([], fn x, acc -> x ++ acc end)
-    new_clusterinfo = state
-      |> Map.get(:clusterinfo)
-      |> Map.update!(:cluster_taskque, fn now_taskque -> if now_taskque == "no engine" do "no engine" else cluster_taskque end end)
-    state = Map.update!(state, :clusterinfo, fn _ -> new_clusterinfo end)
+    clusterinfo = Map.get(state,:clusterinfo)
+    clusterinfo = Map.update!(clusterinfo, :cluster_taskque, fn now_taskque -> if now_taskque == "no engine" do "no engine" else cluster_taskque end end)
+    clusterinfo = Map.update!(clusterinfo, :cluster_response_time, fn now_response_time -> if clusterinfo.cluster_taskque == [] do {0, []} else now_response_time end end)
+    #IO.inspect clusterinfo.cluster_taskque
+    state = Map.update!(state, :clusterinfo, fn _ -> clusterinfo end)
     {:reply, state, state}
   end
 
   def handle_cast({:send_task_response_time_in_cluster, task_response_time_in_cluster}, state) do
-    new_clusterinfo = state
-      |> Map.get(:clusterinfo)
+    old_clusterinfo = Map.get(state, :clusterinfo)
+    new_clusterinfo = old_clusterinfo
       |> Map.update!(:cluster_response_time, fn {_, nowdata} ->
-        newdata = if length(nowdata) < 10 do
-          nowdata ++ [task_response_time_in_cluster]
+          newdata = if length(nowdata) < 10 do
+            nowdata ++ [task_response_time_in_cluster]
           else
-          [_ | tl] = nowdata
-          tl ++ [task_response_time_in_cluster]
+            [_ | tl] = nowdata
+            tl ++ [task_response_time_in_cluster]
           end
-        new_response_time = Enum.sum(newdata) / length(newdata)
-        {new_response_time, newdata} end)
+          new_response_time = Enum.sum(newdata) / length(newdata)
+          {new_response_time, newdata}
+        end)
     state = Map.update!(state, :clusterinfo, fn _ -> new_clusterinfo end)
     {:noreply, state}
   end
@@ -122,10 +129,11 @@ defmodule GRServer do
       |> Map.values()
       |> Enum.map(fn x -> Map.get(x, :taskque) end)
       |> Enum.reduce([], fn x, acc -> x ++ acc end)
-    new_clusterinfo = state
-      |> Map.get(:clusterinfo)
-      |> Map.update!(:cluster_taskque, fn now_taskque -> if now_taskque == "no engine" do "no engine" else cluster_taskque end end)
-    state = Map.update!(state, :clusterinfo, fn _ -> new_clusterinfo end)
+    clusterinfo = Map.get(state,:clusterinfo)
+    clusterinfo = Map.update!(clusterinfo, :cluster_taskque, fn now_taskque -> if now_taskque == "no engine" do "no engine" else cluster_taskque end end)
+    clusterinfo = Map.update!(clusterinfo, :cluster_response_time, fn now_response_time -> if clusterinfo.cluster_taskque == [] do {0, []} else now_response_time end end)
+    #IO.inspect clusterinfo.cluster_taskque
+    state = Map.update!(state, :clusterinfo, fn _ -> clusterinfo end)
 
     GenServer.cast(AlgoServer, {:update_relaymap, self(), state})
 

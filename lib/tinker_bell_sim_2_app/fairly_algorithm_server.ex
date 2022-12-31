@@ -59,6 +59,16 @@ defmodule FAServer do
           |> Enum.min_by(fn {_, val} -> val end)
           |> elem(0)
 
+        #デバッグ用標準出力↓
+        clustermap = state
+          |> Map.delete(:relaynetwork_bandwidth)
+          |> Map.delete(:relaynetwork_delay)
+          |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
+          |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee)} end)
+          |> Enum.map(fn {key, val1, val2, val3} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val3} else {key, elem(val1, 0), length(val2), val3} end end)
+        IO.inspect clustermap
+        #デバッグ用標準出力↑
+
         #IO.inspect(min_taskque_cluster_pid, label: "assigned cluster")
         {:reply, min_taskque_cluster_pid, state}
 
@@ -68,6 +78,16 @@ defmodule FAServer do
           |> Enum.min_by(fn {_, val} -> val end)
           |> elem(0)
 
+        #デバッグ用標準出力↓
+        clustermap = state
+          |> Map.delete(:relaynetwork_bandwidth)
+          |> Map.delete(:relaynetwork_delay)
+          |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
+          |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee)} end)
+          |> Enum.map(fn {key, val1, val2, val3} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val3} else {key, elem(val1, 0), length(val2), val3} end end)
+        IO.inspect clustermap
+        #デバッグ用標準出力↑
+
         #IO.inspect(min_delay_cluster_pid, label: "assigned cluster")
         {:reply, min_delay_cluster_pid, state}
 
@@ -76,6 +96,16 @@ defmodule FAServer do
         max_bandwidth_cluster_pid = bandwidthmap
           |> Enum.max_by(fn {_, val} -> val end)
           |> elem(0)
+
+        #デバッグ用標準出力↓
+        clustermap = state
+          |> Map.delete(:relaynetwork_bandwidth)
+          |> Map.delete(:relaynetwork_delay)
+          |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
+          |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee)} end)
+          |> Enum.map(fn {key, val1, val2, val3} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val3} else {key, elem(val1, 0), length(val2), val3} end end)
+        IO.inspect clustermap
+        #デバッグ用標準出力↑
 
         #IO.inspect(max_bandwidth_cluster_pid, label: "assigned cluster")
         {:reply, max_bandwidth_cluster_pid, state}
@@ -88,14 +118,60 @@ defmodule FAServer do
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time)} end)
           |> Enum.map(fn {key, val} -> {key, elem(val, 0)} end)
         delaymap = Map.get(state.relaynetwork_delay, device_connected_relaypid)
-        cluster_responsetime = cluster_responsetime_in_cluster
+        min_responsetime_cluster_pid = cluster_responsetime_in_cluster
           |> Enum.map(fn {key, val} -> if val == :infinity do {key, val} else {key, val + Map.get(delaymap, key)} end end)
-        IO.inspect cluster_responsetime
-        min_responsetime_cluster_pid = cluster_responsetime
           |> Enum.min_by(fn {_, val} -> val end)
           |> elem(0)
 
+        #デバッグ用標準出力↓
+        clustermap = state
+          |> Map.delete(:relaynetwork_bandwidth)
+          |> Map.delete(:relaynetwork_delay)
+          |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
+          |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee)} end)
+          |> Enum.map(fn {key, val1, val2, val3} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val3} else {key, elem(val1, 0), length(val2), val3} end end)
+        IO.inspect clustermap
+        #デバッグ用標準出力↑
+
         {:reply, min_responsetime_cluster_pid, state}
+
+      "enginefee" ->
+        cluster_responsetime_and_fee_in_cluster = state
+          |> Map.delete(:relaynetwork_bandwidth)
+          |> Map.delete(:relaynetwork_delay)
+          |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
+          |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_fee)} end)
+          |> Enum.map(fn {key, val1, val2} -> {key, elem(val1, 0), val2} end)
+        delaymap = Map.get(state.relaynetwork_delay, device_connected_relaypid)
+        cluster_responsetime_and_fee = cluster_responsetime_and_fee_in_cluster
+          |> Enum.map(fn {key, restime, fee} ->
+              if restime == :infinity do
+                {key, :infinity, :infinity}
+              else
+                if restime + Map.get(delaymap, key) >= task.restime_limit do
+                  {key, restime + Map.get(delaymap, key), :infinity}
+                else
+                  {key, restime + Map.get(delaymap, key), fee}
+                end
+              end
+            end)
+
+        opt_fee_cluster_pid = cluster_responsetime_and_fee
+          |> Enum.min_by(fn {_, _, fee} -> fee end)
+          |> elem(0)
+
+        #デバッグ用標準出力↓
+        clustermap = state
+          |> Map.delete(:relaynetwork_bandwidth)
+          |> Map.delete(:relaynetwork_delay)
+          |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
+          |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee)} end)
+          |> Enum.map(fn {key, val1, val2, val3} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val3} else {key, elem(val1, 0), length(val2), val3} end end)
+        IO.inspect clustermap
+        #デバッグ用標準出力↑
+
+        {:reply, opt_fee_cluster_pid, state}
+
     end
 
   end
@@ -109,7 +185,7 @@ defmodule FAServer do
   #Client API
   def start_link(relaymap \\ %{}) do
     GenServer.start_link(__MODULE__, relaymap, name: AlgoServer)
-    for _ <- 0..4 do
+    for _ <- 0..9 do
       {:ok, pid} = GRServer.start_link()
       relayinfo = GenServer.call(pid, :get_relayinfo)
       GenServer.call(AlgoServer, {:append_relayinfo, pid, relayinfo})
