@@ -141,23 +141,30 @@ defmodule GRServer do
   end
 
   #client API
-  def start_link(relayinfo \\ %{enginemap: %{}, devicemap: %{}, clusterinfo: %{}}) do
+  def start_link(randomseed) do
+    relayinfo = %{enginemap: %{}, devicemap: %{}, clusterinfo: %{}}
     {:ok, mypid} = GenServer.start_link(__MODULE__, relayinfo)
-    enginenum = :rand.uniform(3) - 1
-    if enginenum != 0 do
-      for times <- 1..enginenum do
-        {:ok, pid} = GEServer.start_link(%{relaypid: mypid})
+    enginenum = :rand.uniform(15) - 5
+    devicenum = :rand.uniform(15) - 5
+    enginerandomseed = if enginenum > 0 do 1..enginenum else 1..1 end
+    devicerandomseed = if devicenum > 0 do 1..devicenum else 1..1 end
+    _ = :rand.seed(:exsss, randomseed)
+    enginerandomseed = Enum.map(enginerandomseed, fn _ -> :rand.uniform 1000000 end)
+    devicerandomseed = Enum.map(devicerandomseed, fn _ -> :rand.uniform 1000000 end)
+
+    if enginenum > 0 do
+      Enum.map(enginerandomseed, fn seed ->
+        {:ok, pid} = GEServer.start_link(%{relaypid: mypid, randomseed: seed})
         engineinfo = GenServer.call(pid, :get_engineinfo)
         GenServer.call(mypid, {:append_engineinfo, pid, engineinfo})
         GenServer.cast(pid, :update_engineinfo)
-      end
+      end)
     end
-    devicenum = :rand.uniform(3) - 1
-    if devicenum != 0 do
-      for times <- 0..:rand.uniform 4 do
-        {:ok, pid} = EndDevice.start_link(%{taskflag: false, relaypid: mypid})
+    if devicenum > 0 do
+      Enum.map(devicerandomseed, fn seed ->
+        {:ok, pid} = EndDevice.start_link(%{taskflag: false, relaypid: mypid, randomseed: seed})
         GenServer.call(mypid, {:append_deviceinfo, pid, %{taskflag: false, relaypid: mypid}})
-      end
+      end)
     end
     GenServer.call(mypid, :initialize_clusterinfo)
     {:ok, mypid}

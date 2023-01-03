@@ -183,13 +183,15 @@ defmodule FAServer do
   end
 
   #Client API
-  def start_link(relaymap \\ %{}) do
-    GenServer.start_link(__MODULE__, relaymap, name: AlgoServer)
-    for _ <- 0..9 do
-      {:ok, pid} = GRServer.start_link()
+  def start_link(randomseed) do
+    _ = :rand.seed(:exsss, randomseed)
+    relayrandomseed = Enum.map(0..9, fn _ -> :rand.uniform 1000000 end)
+    GenServer.start_link(__MODULE__, %{}, name: AlgoServer)
+    Enum.map(relayrandomseed, fn seed ->
+      {:ok, pid} = GRServer.start_link(seed)
       relayinfo = GenServer.call(pid, :get_relayinfo)
       GenServer.call(AlgoServer, {:append_relayinfo, pid, relayinfo})
-    end
+    end)
     GenServer.call(AlgoServer, :append_relaynetwork_feature_table)
     IO.inspect GenServer.call(AlgoServer, :get_relaymap)
   end

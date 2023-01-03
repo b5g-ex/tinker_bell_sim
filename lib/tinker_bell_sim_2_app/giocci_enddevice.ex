@@ -31,7 +31,9 @@ defmodule EndDevice do
   end
 
   #Client API
-  def start_link(deviceinfo \\ %{taskflag: false, relaypid: 0}) do
-    GenServer.start_link(__MODULE__, deviceinfo)
+  def start_link(deviceinfo \\ %{taskflag: false, relaypid: 0, randomseed: 0}) do
+    {:ok, mypid} = GenServer.start_link(__MODULE__, deviceinfo)
+    _ = :rand.seed(:exsss, deviceinfo.randomseed)
+    {:ok, mypid}
   end
 end
