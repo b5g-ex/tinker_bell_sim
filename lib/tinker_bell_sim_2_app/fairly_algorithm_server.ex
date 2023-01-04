@@ -184,6 +184,7 @@ defmodule FAServer do
 
   #Client API
   def start_link(randomseed) do
+    File.write("output.txt","")
     _ = :rand.seed(:exsss, randomseed)
     relayrandomseed = Enum.map(0..9, fn _ -> :rand.uniform 1000000 end)
     GenServer.start_link(__MODULE__, %{}, name: AlgoServer)

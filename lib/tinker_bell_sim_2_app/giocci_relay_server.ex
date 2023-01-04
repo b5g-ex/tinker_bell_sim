@@ -48,6 +48,7 @@ defmodule GRServer do
   end
 
   def handle_cast({:send_task_response_time_in_cluster, task_response_time_in_cluster}, state) do
+    File.write("output.txt",Float.to_string(task_response_time_in_cluster) <> "\n",[:append])
     old_clusterinfo = Map.get(state, :clusterinfo)
     new_clusterinfo = old_clusterinfo
       |> Map.update!(:cluster_response_time, fn {_, nowdata} ->
