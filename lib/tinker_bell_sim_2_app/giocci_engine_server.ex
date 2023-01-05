@@ -16,11 +16,10 @@ defmodule GEServer do
 
     _ = :rand.seed(:exsss, state.randomseed)
     flops = 10000 + :rand.uniform 10000
+    #File.write("flops2.txt",Integer.to_string(flops) <> "\n",[:append])
 
     #engine to relay 通信特性はrelay to relay通信路に比べて十分強い通信路を想定し、考慮しなくて良いものとする
-    #fee = :rand.uniform 10000 engineの使用料金は未検討
 
-    #state = Map.merge(state, %{taskque_pid: taskque_pid, hidden_parameter_flops: flops})
     state = Map.merge(state, %{taskque: [], task_assigned_time: [], hidden_parameter_flops: flops, processing_tasks_flag: False})
 
     {:reply, state, state}
@@ -28,37 +27,6 @@ defmodule GEServer do
 
   def handle_cast(:update_engineinfo, state) do
 
-    #GenServer.cast(state.taskque_pid, :update_taskque)
-
-    """
-    :timer.sleep(100)
-    flo_at_iter = round(state.hidden_parameter_flops * 0.1) #100msでの処理能力
-    que = case length(state.taskque) do
-      0 -> []
-      1 -> [hd] = state.taskque
-        if hd <= flo_at_iter do
-          []
-        else
-          [hd - flo_at_iter]
-        end
-      _ -> [hd | tl] = state.taskque
-        if hd <= flo_at_iter do
-          [tlhead | tltail] = tl
-          [tlhead + hd - flo_at_iter | tltail]
-        else
-          [hd - flo_at_iter | tl]
-        end
-    end
-    state = Map.update!(state, :taskque, fn x -> que end) #head taskを100ms分減らす
-    #[hdtask | tltask] = state.taskque
-    #if hdtask <= 0 do
-    #  [new_hdtask | new_tltask] = tltask
-    #  state = Map.update!(state, :taskque, fn now -> [new_hdtask + hdtask | new_tltask] end)
-    #end
-    GenServer.cast(state.relaypid, {:update_enginemap, self(), state})
-
-    GenServer.cast(self(), :update_engineinfo)
-    """
     :timer.sleep(100)
     GenServer.cast(state.relaypid, {:update_enginemap, self(), state})
     GenServer.cast(self(), :update_engineinfo)
@@ -139,8 +107,6 @@ defmodule GEServer do
   #Client API
   def start_link(engineinfo \\ %{relaypid: 0, randomseed: 0}) do
     {:ok, mypid} = GenServer.start_link(__MODULE__, engineinfo)
-    #{:ok, taskque_pid} = GETaskque.start_link(%{enginepid: self(), taskque: []})
-    #GenServer.call(mypid, {:initialize_engineinfo, taskque_pid})
     GenServer.call(mypid, :initialize_engineinfo)
     {:ok, mypid}
   end

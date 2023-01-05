@@ -186,7 +186,8 @@ defmodule FAServer do
   def start_link(randomseed) do
     File.write("output.txt","")
     _ = :rand.seed(:exsss, randomseed)
-    relayrandomseed = Enum.map(0..9, fn _ -> :rand.uniform 1000000 end)
+    relayrandomseed = [{0,10},{0,10},{0,10},{5,5},{5,5},{5,5},{5,5},{10,0},{10,0},{10,0}]
+    relayrandomseed = Enum.map(relayrandomseed, fn {engine, device} -> {engine, device, :rand.uniform 1000000} end)
     GenServer.start_link(__MODULE__, %{}, name: AlgoServer)
     Enum.map(relayrandomseed, fn seed ->
       {:ok, pid} = GRServer.start_link(seed)
@@ -195,6 +196,7 @@ defmodule FAServer do
     end)
     GenServer.call(AlgoServer, :append_relaynetwork_feature_table)
     IO.inspect GenServer.call(AlgoServer, :get_relaymap)
+    IO.inspect relayrandomseed
   end
 
   def start_assigning() do

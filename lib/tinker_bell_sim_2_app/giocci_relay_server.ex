@@ -48,7 +48,7 @@ defmodule GRServer do
   end
 
   def handle_cast({:send_task_response_time_in_cluster, task_response_time_in_cluster}, state) do
-    File.write("output.txt",Float.to_string(task_response_time_in_cluster) <> "\n",[:append])
+    #File.write("outputbandwidth.txt",Float.to_string(task_response_time_in_cluster) <> "\n",[:append])
     old_clusterinfo = Map.get(state, :clusterinfo)
     new_clusterinfo = old_clusterinfo
       |> Map.update!(:cluster_response_time, fn {_, nowdata} ->
@@ -145,13 +145,15 @@ defmodule GRServer do
   def start_link(randomseed) do
     relayinfo = %{enginemap: %{}, devicemap: %{}, clusterinfo: %{}}
     {:ok, mypid} = GenServer.start_link(__MODULE__, relayinfo)
-    enginenum = :rand.uniform(15) - 5
-    devicenum = :rand.uniform(15) - 5
+    enginenum = elem(randomseed, 0)
+    devicenum = elem(randomseed, 1)
     enginerandomseed = if enginenum > 0 do 1..enginenum else 1..1 end
     devicerandomseed = if devicenum > 0 do 1..devicenum else 1..1 end
-    _ = :rand.seed(:exsss, randomseed)
+    _ = :rand.seed(:exsss, elem(randomseed, 2))
     enginerandomseed = Enum.map(enginerandomseed, fn _ -> :rand.uniform 1000000 end)
     devicerandomseed = Enum.map(devicerandomseed, fn _ -> :rand.uniform 1000000 end)
+    IO.inspect enginerandomseed
+    IO.inspect devicerandomseed
 
     if enginenum > 0 do
       Enum.map(enginerandomseed, fn seed ->
