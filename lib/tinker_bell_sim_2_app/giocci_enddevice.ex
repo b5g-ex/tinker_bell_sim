@@ -30,7 +30,7 @@ defmodule EndDevice do
     #create task ↓
     florand = :rand.uniform 2000
     #File.write("outputflo2.txt",Integer.to_string(florand) <> "\n",[:append])
-    task = %{flo: 1000 + florand, algo: "bandwidth", restime_limit: 1000}
+    task = %{flo: 1000 + florand, algo: "taskque", restime_limit: 1000}
     #IO.inspect(self(), label: "task request from Device") 標準出力
     GenServer.call(state.relaypid, {:assign_request, self(), task})
 
@@ -44,7 +44,7 @@ defmodule EndDevice do
   end
 
   #Client API
-  def start_link(deviceinfo \\ %{taskflag: false, relaypid: 0, randomseed: 0}) do
+  def start_link(deviceinfo \\ %{taskflag: false, relaypid: 0, randomseed: 0, algo: 0}) do
     {:ok, mypid} = GenServer.start_link(__MODULE__, deviceinfo)
     GenServer.cast(self(), :set_randomseed)
     {:ok, mypid}
