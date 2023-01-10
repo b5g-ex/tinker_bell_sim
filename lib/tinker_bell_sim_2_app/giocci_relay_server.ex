@@ -71,8 +71,17 @@ defmodule GRServer do
 
   def handle_cast(:start_assigning, state) do
     devicepids = Map.keys(state.devicemap)
-    Enum.map(devicepids, fn pid -> GenServer.cast(pid, :taskflag_true)
-      GenServer.cast(pid, :create_task) end)
+
+    new_devicemap = state
+      |> Map.get(:devicemap)
+      |> Enum.map(fn {devicepid, deviceinfo} -> {devicepid, Map.update!(deviceinfo, :creating_task, fn _ -> true end)} end)
+      |> Enum.reduce(%{}, fn {devicepid, deviceinfo}, acc -> Map.put_new(acc, devicepid, deviceinfo) end)
+    state = Map.update!(state, :devicemap, fn _ -> new_devicemap end)
+
+    Enum.map(devicepids, fn pid ->
+      GenServer.cast(pid, :taskflag_true)
+      GenServer.cast(pid, :create_task)
+    end)
     {:noreply, state}
   end
 
@@ -143,9 +152,45 @@ defmodule GRServer do
     {:noreply, state}
   end
 
+  def handle_cast({:device_finish_creating_task, devicepid}, state) do
+
+    now_devicemap = Map.get(state, :devicemap)
+    new_devicemap = Map.update!(now_devicemap, devicepid, fn deviceinfo -> Map.update!(deviceinfo, :creating_task, fn _ -> false end) end)
+    state = Map.update!(state, :devicemap, fn _ -> new_devicemap end)
+
+    are_tasks_being_created? = state
+      |> Map.get(:devicemap)
+    IO.inspect are_tasks_being_created?
+    are_tasks_being_created? = are_tasks_being_created?
+      |> Enum.map(fn {_, val} -> Map.get(val, :creating_task) end)
+      |> Enum.max()
+    IO.inspect are_tasks_being_created?
+
+    if are_tasks_being_created? == false do
+      GenServer.cast(AlgoServer, {:relay_finish_handling_task, self()})
+      IO.inspect "finish handling tasks in relay"
+    end
+    {:noreply, state}
+  end
+
+  def handle_call(:initialize_taskseed, _from, state) do
+    state = Map.update!(state, :initialize_info, fn {algo, taskseed} -> {algo + 1, taskseed} end)
+    {algo, taskseed} = state.initialize_info
+
+    state
+      |> Map.get(:devicemap)
+      |> Map.keys()
+      |> Enum.map(fn devicepid ->
+        GenServer.cast(devicepid, {:set_randomseed, taskseed})
+        GenServer.cast(devicepid, {:set_algo, algo})
+      end)
+
+    {:reply, state, state}
+  end
+
   #client API
   def start_link(randomseed) do
-    relayinfo = %{enginemap: %{}, devicemap: %{}, clusterinfo: %{}}
+    relayinfo = %{enginemap: %{}, devicemap: %{}, clusterinfo: %{}, initialize_info: {0, elem(randomseed, 2)}}
     {:ok, mypid} = GenServer.start_link(__MODULE__, relayinfo)
     enginenum = elem(randomseed, 0)
     devicenum = elem(randomseed, 1)
@@ -168,8 +213,8 @@ defmodule GRServer do
     end
     if devicenum > 0 do
       Enum.map(devicerandomseed, fn seed ->
-        {:ok, pid} = EndDevice.start_link(%{taskflag: false, relaypid: mypid, randomseed: seed, algo: 0})
-        GenServer.call(mypid, {:append_deviceinfo, pid, %{taskflag: false, relaypid: mypid}})
+        {:ok, pid} = EndDevice.start_link(%{taskflag: false, relaypid: mypid, randomseed: seed, algo: "taskque"})
+        GenServer.call(mypid, {:append_deviceinfo, pid, %{taskflag: false, relaypid: mypid, creating_task: False}})
       end)
     end
     GenServer.call(mypid, :initialize_clusterinfo)

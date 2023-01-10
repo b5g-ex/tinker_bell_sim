@@ -46,19 +46,45 @@ defmodule FAServer do
     {:reply, state, state}
   end
 
-  def handle_call(:initialize_tasknum, _from, state) do
+  def handle_cast(:initialize_tasknum, state) do
     state = Map.update(state, :tasknum, 0, fn _ -> 0 end)
-    {:reply, state, state}
+    {:noreply, state}
   end
 
   def handle_call({:append_tasknumlimit, tasknumlimit}, _from, state) do
+    IO.inspect "Debug 1"
     state = Map.put_new(state, :tasknumlimit, tasknumlimit)
+    IO.inspect "Debug 2"
     {:reply, state, state}
+  end
+
+  def handle_cast({:initialize_creating_task_flag, initial_flag}, state) do
+    relay_handling_task_flag = state
+      |> Map.delete(:relaynetwork_bandwidth)
+      |> Map.delete(:relaynetwork_delay)
+      |> Map.delete(:tasknum)
+      |> Map.delete(:tasknumlimit)
+      |> Map.delete(:creating_task_flag)
+      |> Map.keys()
+      |> Enum.reduce(%{}, fn relaypid, acc ->
+          devicemap = state
+            |> Map.get(relaypid)
+            |> Map.get(:devicemap)
+          if devicemap == %{} do
+            Map.put_new(acc, relaypid, false)
+          else
+            Map.put_new(acc, relaypid, initial_flag)
+          end
+        end)
+    state = Map.update(state, :creating_task_flag, relay_handling_task_flag, fn _ -> relay_handling_task_flag end)
+    {:noreply, state}
   end
 
   def handle_call({:assign_algorithm, devicepid, device_connected_relaypid, task}, _from, state) do
 
     state = Map.update!(state, :tasknum, fn prev -> prev + 1 end)
+    IO.inspect state.tasknum
+    IO.inspect state.creating_task_flag
 
     case task.algo do
       "taskque" ->
@@ -67,6 +93,7 @@ defmodule FAServer do
           |> Map.delete(:relaynetwork_delay)
           |> Map.delete(:tasknum)
           |> Map.delete(:tasknumlimit)
+          |> Map.delete(:creating_task_flag)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
         cluster_taskque_num = Enum.map(clustermap, fn {key, val} -> {key, if val.cluster_taskque == "no engine" do :infinity else length(val.cluster_taskque) end} end)
         min_taskque_cluster_pid = cluster_taskque_num
@@ -79,6 +106,7 @@ defmodule FAServer do
           |> Map.delete(:relaynetwork_delay)
           |> Map.delete(:tasknum)
           |> Map.delete(:tasknumlimit)
+          |> Map.delete(:creating_task_flag)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee)} end)
           |> Enum.map(fn {key, val1, val2, val3} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val3} else {key, elem(val1, 0), length(val2), val3} end end)
@@ -86,6 +114,19 @@ defmodule FAServer do
         #デバッグ用標準出力↑
 
         #IO.inspect(min_taskque_cluster_pid, label: "assigned cluster")
+        if state.tasknum == state.tasknumlimit do
+          state
+            |> Map.delete(:relaynetwork_bandwidth)
+            |> Map.delete(:relaynetwork_delay)
+            |> Map.delete(:tasknum)
+            |> Map.delete(:tasknumlimit)
+            |> Map.delete(:creating_task_flag)
+            |> Map.keys()
+            |> Enum.map(fn pid ->
+                GenServer.cast(pid, :stop_assigning)
+                {:ok}
+              end)
+        end
         if state.tasknum > state.tasknumlimit do
           {:reply, "tasknumlimit", state}
         else
@@ -104,6 +145,7 @@ defmodule FAServer do
           |> Map.delete(:relaynetwork_delay)
           |> Map.delete(:tasknum)
           |> Map.delete(:tasknumlimit)
+          |> Map.delete(:creating_task_flag)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee)} end)
           |> Enum.map(fn {key, val1, val2, val3} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val3} else {key, elem(val1, 0), length(val2), val3} end end)
@@ -111,7 +153,24 @@ defmodule FAServer do
         #デバッグ用標準出力↑
 
         #IO.inspect(min_delay_cluster_pid, label: "assigned cluster")
-        {:reply, min_delay_cluster_pid, state}
+        if state.tasknum == state.tasknumlimit do
+          state
+            |> Map.delete(:relaynetwork_bandwidth)
+            |> Map.delete(:relaynetwork_delay)
+            |> Map.delete(:tasknum)
+            |> Map.delete(:tasknumlimit)
+            |> Map.delete(:creating_task_flag)
+            |> Map.keys()
+            |> Enum.map(fn pid ->
+                GenServer.cast(pid, :stop_assigning)
+                {:ok}
+              end)
+        end
+        if state.tasknum > state.tasknumlimit do
+          {:reply, "tasknumlimit", state}
+        else
+          {:reply, min_delay_cluster_pid, state}
+        end
 
       "bandwidth" ->
         bandwidthmap = Map.get(state.relaynetwork_bandwidth, device_connected_relaypid)
@@ -125,6 +184,7 @@ defmodule FAServer do
           |> Map.delete(:relaynetwork_delay)
           |> Map.delete(:tasknum)
           |> Map.delete(:tasknumlimit)
+          |> Map.delete(:creating_task_flag)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee)} end)
           |> Enum.map(fn {key, val1, val2, val3} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val3} else {key, elem(val1, 0), length(val2), val3} end end)
@@ -132,7 +192,21 @@ defmodule FAServer do
         #デバッグ用標準出力↑
 
         #IO.inspect(max_bandwidth_cluster_pid, label: "assigned cluster")
-        {:reply, max_bandwidth_cluster_pid, state}
+        if state.tasknum == state.tasknumlimit do
+          state
+            |> Map.delete(:relaynetwork_bandwidth)
+            |> Map.delete(:relaynetwork_delay)
+            |> Map.delete(:tasknum)
+            |> Map.delete(:tasknumlimit)
+            |> Map.delete(:creating_task_flag)
+            |> Map.keys()
+            |> Enum.map(fn pid -> GenServer.cast(pid, :stop_assigning) end)
+        end
+        if state.tasknum > state.tasknumlimit do
+          {:reply, "tasknumlimit", state}
+        else
+          {:reply, max_bandwidth_cluster_pid, state}
+        end
 
       "responsetime" ->
         cluster_responsetime_in_cluster = state
@@ -140,6 +214,7 @@ defmodule FAServer do
           |> Map.delete(:relaynetwork_delay)
           |> Map.delete(:tasknum)
           |> Map.delete(:tasknumlimit)
+          |> Map.delete(:creating_task_flag)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time)} end)
           |> Enum.map(fn {key, val} -> {key, elem(val, 0)} end)
@@ -155,13 +230,27 @@ defmodule FAServer do
           |> Map.delete(:relaynetwork_delay)
           |> Map.delete(:tasknum)
           |> Map.delete(:tasknumlimit)
+          |> Map.delete(:creating_task_flag)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee)} end)
           |> Enum.map(fn {key, val1, val2, val3} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val3} else {key, elem(val1, 0), length(val2), val3} end end)
         IO.inspect clustermap
         #デバッグ用標準出力↑
-
-        {:reply, min_responsetime_cluster_pid, state}
+        if state.tasknum == state.tasknumlimit do
+          state
+            |> Map.delete(:relaynetwork_bandwidth)
+            |> Map.delete(:relaynetwork_delay)
+            |> Map.delete(:tasknum)
+            |> Map.delete(:tasknumlimit)
+            |> Map.delete(:creating_task_flag)
+            |> Map.keys()
+            |> Enum.map(fn pid -> GenServer.cast(pid, :stop_assigning) end)
+        end
+        if state.tasknum > state.tasknumlimit do
+          {:reply, "tasknumlimit", state}
+        else
+          {:reply, min_responsetime_cluster_pid, state}
+        end
 
       "enginefee" ->
         cluster_responsetime_and_fee_in_cluster = state
@@ -169,6 +258,7 @@ defmodule FAServer do
           |> Map.delete(:relaynetwork_delay)
           |> Map.delete(:tasknum)
           |> Map.delete(:tasknumlimit)
+          |> Map.delete(:creating_task_flag)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_fee)} end)
           |> Enum.map(fn {key, val1, val2} -> {key, elem(val1, 0), val2} end)
@@ -196,16 +286,69 @@ defmodule FAServer do
           |> Map.delete(:relaynetwork_delay)
           |> Map.delete(:tasknum)
           |> Map.delete(:tasknumlimit)
+          |> Map.delete(:creating_task_flag)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee)} end)
           |> Enum.map(fn {key, val1, val2, val3} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val3} else {key, elem(val1, 0), length(val2), val3} end end)
         IO.inspect clustermap
         #デバッグ用標準出力↑
 
-        {:reply, opt_fee_cluster_pid, state}
+        if state.tasknum == state.tasknumlimit do
+          state
+            |> Map.delete(:relaynetwork_bandwidth)
+            |> Map.delete(:relaynetwork_delay)
+            |> Map.delete(:tasknum)
+            |> Map.delete(:tasknumlimit)
+            |> Map.delete(:creating_task_flag)
+            |> Map.keys()
+            |> Enum.map(fn pid -> GenServer.cast(pid, :stop_assigning) end)
+        end
+        if state.tasknum > state.tasknumlimit do
+          {:reply, "tasknumlimit", state}
+        else
+          {:reply, opt_fee_cluster_pid, state}
+        end
 
     end
 
+  end
+
+  def handle_cast({:relay_finish_handling_task, relaypid}, state) do
+    creating_task_flag = state
+      |> Map.get(:creating_task_flag)
+      |> Map.update!(relaypid, fn _ -> false end)
+    state = Map.update!(state, :creating_task_flag, fn _ -> creating_task_flag end)
+
+    are_tasks_being_handled_in_relay? = state
+      |> Map.get(:creating_task_flag)
+      |> Enum.map(fn {_, val} -> val end)
+      |> Enum.max()
+
+    if are_tasks_being_handled_in_relay? == false do
+      GenServer.cast(AlgoServer, :initialize_parameters)
+    end
+    {:noreply, state}
+  end
+
+  def handle_cast(:initialize_parameters, state) do
+    File.write("responsetime.txt","\n\n\n\n\n",[:append])
+
+    #パラメータを初期化して次の実験へ
+    GenServer.cast(AlgoServer, :initialize_tasknum)
+    relaypids = state
+      |> Map.delete(:relaynetwork_bandwidth)
+      |> Map.delete(:relaynetwork_delay)
+      |> Map.delete(:tasknum)
+      |> Map.delete(:tasknumlimit)
+      |> Map.delete(:creating_task_flag)
+      |> Map.keys()
+    Enum.map(relaypids, fn relaypid -> GenServer.call(relaypid, :initialize_taskseed) end)
+
+    #start_assigning
+    GenServer.cast(AlgoServer, {:initialize_creating_task_flag, true})
+    Enum.map(relaypids, fn relaypid -> GenServer.cast(relaypid, :start_assigning) end)
+
+    {:noreply, state}
   end
 
   def handle_cast({:update_relaymap, relaypid, new_relayinfo}, state) do
@@ -228,14 +371,16 @@ defmodule FAServer do
       relayinfo = GenServer.call(pid, :get_relayinfo)
       GenServer.call(AlgoServer, {:append_relayinfo, pid, relayinfo})
     end)
-    GenServer.call(AlgoServer, {:append_relaynetwork_feature_table, :rand.uniform 1000000})
-    GenServer.call(AlgoServer, :initialize_tasknum)
+    GenServer.call(AlgoServer, {:append_relaynetwork_feature_table, :rand.uniform 1000000}) #engineseedによって固定されている
+    GenServer.cast(AlgoServer, :initialize_tasknum)
     GenServer.call(AlgoServer, {:append_tasknumlimit, tasknumlimit})
+    GenServer.cast(AlgoServer, {:initialize_creating_task_flag, false})
     IO.inspect GenServer.call(AlgoServer, :get_relaymap)
     IO.inspect relayrandomseed
   end
 
   def start_assigning() do
+    GenServer.cast(AlgoServer, {:initialize_creating_task_flag, true})
     GenServer.call(AlgoServer, :get_relaymap)
     |> Map.keys()
     |> Enum.map(fn pid -> GenServer.cast(pid, :start_assigning) end)
