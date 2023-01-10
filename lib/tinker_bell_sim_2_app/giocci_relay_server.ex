@@ -99,6 +99,7 @@ defmodule GRServer do
       {:reply, state, state}
     else
       if self() == assigned_cluster_pid do
+        File.write("clusterfee.txt",Float.to_string(state.clusterinfo.cluster_fee) <> "\n",[:append])
         #クラスター内assignはタスクキュー数のみで決定
         engine_taskque_scores = state.enginemap
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :taskque)} end)
@@ -117,6 +118,7 @@ defmodule GRServer do
   end
 
   def handle_cast({:assign_task_in_cluster,task}, state) do
+    File.write("clusterfee.txt",Float.to_string(state.clusterinfo.cluster_fee) <> "\n",[:append])
     #クラスター内assignはタスクキュー数のみで決定
     engine_taskque_scores = state.enginemap
       |> Enum.map(fn {key, val} -> {key, Map.get(val, :taskque)} end)

@@ -25,11 +25,11 @@ defmodule EndDevice do
   def handle_cast({:set_algo, algonum}, state) do
     state = Map.update!(state, :algo, fn _ ->
       case algonum do
-        #0 -> "taskque"
-        #1 -> "delay"
-        #2 -> "bandwidth"
-        #3 -> "responsetime"
-        #4 -> "enginefee"
+        x when 0 <= x and x <= 2 -> "taskque"
+        x when 3 <= x and x <= 5 -> "delay"
+        x when 6 <= x and x <= 7 -> "bandwidth"
+        x when 9 <= x and x <= 11 -> "responsetime"
+        x when 12 <= x and x <= 14 -> "clusterfee"
         _ -> "taskque"
       end
     end)
@@ -42,9 +42,9 @@ defmodule EndDevice do
     #File.write("outputtimer2.txt",Integer.to_string(timerrand) <> "\n",[:append])
     :timer.sleep(2000 + timerrand)
     #create task ↓
-    florand = :rand.uniform 2000
+    florand = :rand.uniform 20000
     #File.write("outputflo2.txt",Integer.to_string(florand) <> "\n",[:append])
-    task = %{flo: 1000 + florand, algo: state.algo, restime_limit: 1000}
+    task = %{flo: 10000 + florand, algo: state.algo, restime_limit: 1000}
     #IO.inspect(self(), label: "task request from Device") 標準出力
     GenServer.call(state.relaypid, {:assign_request, self(), task})
 

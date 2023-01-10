@@ -252,7 +252,7 @@ defmodule FAServer do
           {:reply, min_responsetime_cluster_pid, state}
         end
 
-      "enginefee" ->
+      "clusterfee" ->
         cluster_responsetime_and_fee_in_cluster = state
           |> Map.delete(:relaynetwork_bandwidth)
           |> Map.delete(:relaynetwork_delay)
@@ -325,13 +325,35 @@ defmodule FAServer do
       |> Enum.max()
 
     if are_tasks_being_handled_in_relay? == false do
+      GenServer.cast(AlgoServer, :wait_for_tasklists)
+    end
+    {:noreply, state}
+  end
+
+  def handle_cast(:wait_for_tasklists, state) do
+    max_taskque_num = state
+      |> Map.delete(:relaynetwork_bandwidth)
+      |> Map.delete(:relaynetwork_delay)
+      |> Map.delete(:tasknum)
+      |> Map.delete(:tasknumlimit)
+      |> Map.delete(:creating_task_flag)
+      |> Enum.map(fn {_, val} -> Map.get(val, :clusterinfo) end)
+      |> Enum.map(fn clusterinfo -> Map.get(clusterinfo, :cluster_taskque) end)
+      |> Enum.map(fn cluster_taskque -> if cluster_taskque == "no engine" do 0 else length(cluster_taskque) end end)
+      |> Enum.max()
+    if max_taskque_num == 0 do
       GenServer.cast(AlgoServer, :initialize_parameters)
+    else
+      wait_for_tasklists = Task.async(fn -> :timer.sleep(1000); :ok end)
+      Task.await(wait_for_tasklists)
+      GenServer.cast(AlgoServer, :wait_for_tasklists)
     end
     {:noreply, state}
   end
 
   def handle_cast(:initialize_parameters, state) do
     File.write("responsetime.txt","\n\n\n\n\n",[:append])
+    File.write("clusterfee.txt","\n\n\n\n\n",[:append])
 
     #パラメータを初期化して次の実験へ
     GenServer.cast(AlgoServer, :initialize_tasknum)
