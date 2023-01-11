@@ -25,12 +25,20 @@ defmodule EndDevice do
   def handle_cast({:set_algo, algonum}, state) do
     state = Map.update!(state, :algo, fn _ ->
       case algonum do
+        #各iterationにおけるアルゴリズム決定部分
+        #algonumは今何回目の試行かを示すパラメータ(0-indexed)
+        #アルゴリズム名称は
+        # taskque       タスクキュー最小Clusterへ割付
+        # delay         R-R通信遅延最小化
+        # bandwidth     R-R通信帯域幅最大化
+        # responsetime  応答時間最小化
+        # clusterfee    Cluster利用コスト最適化（応答時間予測値が55行目のrestime_limitを超えないClusterの中でコスト最小のものを選択）
         x when 0 <= x and x <= 2 -> "clusterfee"
         x when 3 <= x and x <= 5 -> "responsetime"
         x when 6 <= x and x <= 8 -> "bandwidth"
         x when 9 <= x and x <= 11 -> "delay"
         x when 12 <= x and x <= 14 -> "taskque"
-        _ -> raise "end"
+        _ -> raise "end" #指定回数の試行が終わったらエラーを吐かせて止めます
       end
     end)
     {:noreply, state}
@@ -44,7 +52,7 @@ defmodule EndDevice do
     #create task ↓
     florand = :rand.uniform 5000
     #File.write("outputflo2.txt",Integer.to_string(florand) <> "\n",[:append])
-    task = %{flo: 2500 + florand, algo: state.algo, restime_limit: 3000}
+    task = %{flo: 2500 + florand, algo: state.algo, restime_limit: 3000} #restime_limitはCluster利用コスト最適化における応答時間の閾値
     #IO.inspect(self(), label: "task request from Device") 標準出力
     GenServer.call(state.relaypid, {:assign_request, self(), task})
 

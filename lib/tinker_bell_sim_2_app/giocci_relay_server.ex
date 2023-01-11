@@ -176,23 +176,29 @@ defmodule GRServer do
   end
 
   def handle_call(:initialize_taskseed, _from, state) do
-    state = Map.update!(state, :initialize_info, fn {algo, taskseed} -> {algo + 1, taskseed} end)
-    {algo, taskseed} = state.initialize_info
+    state = Map.update!(state, :initialize_info, fn {algonum, taskseed} -> {algonum + 1, taskseed} end)
+    {algonum, taskseed} = state.initialize_info
 
-    state
+    devicepids = state
       |> Map.get(:devicemap)
       |> Map.keys()
-      |> Enum.map(fn devicepid ->
-        GenServer.cast(devicepid, {:set_randomseed, taskseed})
-        GenServer.cast(devicepid, {:set_algo, algo})
+    if length(devicepids) == 0 do
+      {:reply, state, state}
+    else
+      _ = :rand.seed(:exsss, taskseed)
+      Enum.map(devicepids, fn devicepid -> {devicepid, :rand.uniform 1000000} end)
+      |> Enum.map(fn {devicepid, devicetaskseed} ->
+        GenServer.cast(devicepid, {:set_randomseed, devicetaskseed})
+        GenServer.cast(devicepid, {:set_algo, algonum})
       end)
+      {:reply, state, state}
+    end
 
-    {:reply, state, state}
   end
 
   #client API
   def start_link(randomseed) do
-    relayinfo = %{enginemap: %{}, devicemap: %{}, clusterinfo: %{}, initialize_info: {0, elem(randomseed, 2)}}
+    relayinfo = %{enginemap: %{}, devicemap: %{}, clusterinfo: %{}, initialize_info: {0, elem(randomseed, 2)}} #initialize_info: {algonum, taskseed(relay)}
     {:ok, mypid} = GenServer.start_link(__MODULE__, relayinfo)
     enginenum = elem(randomseed, 0)
     devicenum = elem(randomseed, 1)
@@ -214,9 +220,11 @@ defmodule GRServer do
       end)
     end
     if devicenum > 0 do
+      {algonum, taskseed} = relayinfo.initialize_info
       Enum.map(devicerandomseed, fn seed ->
         {:ok, pid} = EndDevice.start_link(%{taskflag: false, relaypid: mypid, randomseed: seed, algo: "taskque"})
         GenServer.call(mypid, {:append_deviceinfo, pid, %{taskflag: false, relaypid: mypid, creating_task: False}})
+        GenServer.cast(pid, {:set_algo, algonum})
       end)
     end
     GenServer.call(mypid, :initialize_clusterinfo)
