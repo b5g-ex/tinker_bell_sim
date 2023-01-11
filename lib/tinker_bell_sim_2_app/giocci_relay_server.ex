@@ -118,7 +118,7 @@ defmodule GRServer do
   end
 
   def handle_cast({:assign_task_in_cluster,task}, state) do
-    File.write("clusterfee.txt",Float.to_string(state.clusterinfo.cluster_fee) <> "\n",[:append])
+    File.write("clusterfee.txt", Float.to_string(state.clusterinfo.cluster_fee) <> "\n",[:append])
     #クラスター内assignはタスクキュー数のみで決定
     engine_taskque_scores = state.enginemap
       |> Enum.map(fn {key, val} -> {key, Map.get(val, :taskque)} end)
@@ -162,15 +162,15 @@ defmodule GRServer do
 
     are_tasks_being_created? = state
       |> Map.get(:devicemap)
-    IO.inspect are_tasks_being_created?
+    #IO.inspect are_tasks_being_created?
     are_tasks_being_created? = are_tasks_being_created?
       |> Enum.map(fn {_, val} -> Map.get(val, :creating_task) end)
       |> Enum.max()
-    IO.inspect are_tasks_being_created?
+    #IO.inspect are_tasks_being_created?
 
     if are_tasks_being_created? == false do
       GenServer.cast(AlgoServer, {:relay_finish_handling_task, self()})
-      IO.inspect "finish handling tasks in relay"
+      #IO.inspect "finish handling tasks in relay"
     end
     {:noreply, state}
   end
