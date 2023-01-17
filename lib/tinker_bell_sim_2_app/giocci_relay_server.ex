@@ -30,7 +30,7 @@ defmodule GRServer do
       |> Map.values()
       |> Enum.map(fn x -> Map.get(x, :hidden_parameter_flops) end)
       |> Enum.reduce(0, fn x, acc -> x + acc end)
-    state = Map.update!(state, :clusterinfo, fn _ -> if state.enginemap == %{} do %{cluster_taskque: "no engine", cluster_enginenum: 0, cluster_response_time: {:infinity, []}, cluster_fee: :infinity} else %{cluster_taskque: cluster_taskque, cluster_enginenum: Enum.count(state.enginemap), cluster_response_time: {0,[]}, cluster_fee: (cluster_flops_sum / Enum.count(state.enginemap))} end end)
+    state = Map.update!(state, :clusterinfo, fn _ -> if state.enginemap == %{} do %{cluster_taskque: "no engine", cluster_enginenum: 0, cluster_response_time: {:infinity, [], :infinity, []}, cluster_fee: :infinity} else %{cluster_taskque: cluster_taskque, cluster_enginenum: Enum.count(state.enginemap), cluster_response_time: {0,[],0,[]}, cluster_fee: (cluster_flops_sum / Enum.count(state.enginemap))} end end)
     {:reply, state, state}
   end
 
@@ -41,7 +41,7 @@ defmodule GRServer do
       |> Enum.reduce([], fn x, acc -> x ++ acc end)
     clusterinfo = Map.get(state,:clusterinfo)
     clusterinfo = Map.update!(clusterinfo, :cluster_taskque, fn now_taskque -> if now_taskque == "no engine" do "no engine" else cluster_taskque end end)
-    clusterinfo = Map.update!(clusterinfo, :cluster_response_time, fn now_response_time -> if clusterinfo.cluster_taskque == [] do {0, []} else now_response_time end end)
+    #clusterinfo = Map.update!(clusterinfo, :cluster_response_time, fn now_response_time -> if clusterinfo.cluster_taskque == [] do {0, []} else now_response_time end end)
     #IO.inspect clusterinfo.cluster_taskque
     state = Map.update!(state, :clusterinfo, fn _ -> clusterinfo end)
     {:reply, state, state}
@@ -51,15 +51,27 @@ defmodule GRServer do
     File.write("responsetime.txt",Float.to_string(task_response_time_in_cluster) <> "\n",[:append])
     old_clusterinfo = Map.get(state, :clusterinfo)
     new_clusterinfo = old_clusterinfo
-      |> Map.update!(:cluster_response_time, fn {_, nowdata} ->
-          newdata = if length(nowdata) < 10 do
+      |> Map.update!(:cluster_response_time, fn {_, nowdata, _, nowhistory} ->
+
+          newdata = if length(nowdata) < 3 do
             nowdata ++ [task_response_time_in_cluster]
           else
             [_ | tl] = nowdata
             tl ++ [task_response_time_in_cluster]
           end
           new_response_time = Enum.sum(newdata) / length(newdata)
-          {new_response_time, newdata}
+
+          newhistory = if length(nowhistory) < 30 do
+            nowhistory ++ [task_response_time_in_cluster]
+          else
+            [_ | tl] = nowhistory
+            tl ++ [task_response_time_in_cluster]
+          end
+          new_response_time_history = Enum.sum(newhistory) / length(newhistory)
+
+          new_response_time = if old_clusterinfo.cluster_taskque == [] do new_response_time_history else new_response_time end
+
+          {new_response_time, newdata, new_response_time_history, newhistory}
         end)
     state = Map.update!(state, :clusterinfo, fn _ -> new_clusterinfo end)
     {:noreply, state}
@@ -145,7 +157,7 @@ defmodule GRServer do
       |> Enum.reduce([], fn x, acc -> x ++ acc end)
     clusterinfo = Map.get(state,:clusterinfo)
     clusterinfo = Map.update!(clusterinfo, :cluster_taskque, fn now_taskque -> if now_taskque == "no engine" do "no engine" else cluster_taskque end end)
-    clusterinfo = Map.update!(clusterinfo, :cluster_response_time, fn now_response_time -> if clusterinfo.cluster_taskque == [] do {0, []} else now_response_time end end)
+    #clusterinfo = Map.update!(clusterinfo, :cluster_response_time, fn now_response_time -> if clusterinfo.cluster_taskque == [] do {0, []} else now_response_time end end)
     #IO.inspect clusterinfo.cluster_taskque
     state = Map.update!(state, :clusterinfo, fn _ -> clusterinfo end)
 
