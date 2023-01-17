@@ -15,7 +15,7 @@ defmodule GEServer do
   def handle_call(:initialize_engineinfo, _from, state) do
 
     _ = :rand.seed(:exsss, state.randomseed)
-    flops = 5000 + :rand.uniform 10000
+    flops = if state.flopsflag do 5000 + :rand.uniform 10000 else 500 + :rand.uniform 1000 end
     #File.write("flops2.txt",Integer.to_string(flops) <> "\n",[:append])
 
     #engine to relay 通信特性はrelay to relay通信路に比べて十分強い通信路を想定し、考慮しなくて良いものとする
@@ -105,7 +105,7 @@ defmodule GEServer do
   end
 
   #Client API
-  def start_link(engineinfo \\ %{relaypid: 0, randomseed: 0}) do
+  def start_link(engineinfo \\ %{relaypid: 0, randomseed: 0, flopsflag: false}) do
     {:ok, mypid} = GenServer.start_link(__MODULE__, engineinfo)
     GenServer.call(mypid, :initialize_engineinfo)
     {:ok, mypid}

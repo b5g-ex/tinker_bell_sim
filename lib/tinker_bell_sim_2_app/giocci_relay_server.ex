@@ -198,22 +198,22 @@ defmodule GRServer do
 
   #client API
   def start_link(randomseed) do
-    relayinfo = %{enginemap: %{}, devicemap: %{}, clusterinfo: %{}, initialize_info: {0, elem(randomseed, 2)}} #initialize_info: {algonum, taskseed(relay)}
+    relayinfo = %{enginemap: %{}, devicemap: %{}, clusterinfo: %{}, initialize_info: {0, elem(randomseed, 3)}} #initialize_info: {algonum, taskseed(relay)}
     {:ok, mypid} = GenServer.start_link(__MODULE__, relayinfo)
     enginenum = elem(randomseed, 0)
     devicenum = elem(randomseed, 1)
     enginerandomseed = if enginenum > 0 do 1..enginenum else 1..1 end
     devicerandomseed = if devicenum > 0 do 1..devicenum else 1..1 end
-    _ = :rand.seed(:exsss, elem(randomseed, 2))
-    devicerandomseed = Enum.map(devicerandomseed, fn _ -> :rand.uniform 1000000 end)
     _ = :rand.seed(:exsss, elem(randomseed, 3))
+    devicerandomseed = Enum.map(devicerandomseed, fn _ -> :rand.uniform 1000000 end)
+    _ = :rand.seed(:exsss, elem(randomseed, 4))
     enginerandomseed = Enum.map(enginerandomseed, fn _ -> :rand.uniform 1000000 end)
     IO.inspect enginerandomseed
     IO.inspect devicerandomseed
 
     if enginenum > 0 do
       Enum.map(enginerandomseed, fn seed ->
-        {:ok, pid} = GEServer.start_link(%{relaypid: mypid, randomseed: seed})
+        {:ok, pid} = GEServer.start_link(%{relaypid: mypid, randomseed: seed, flopsflag: elem(randomseed, 2)})
         engineinfo = GenServer.call(pid, :get_engineinfo)
         GenServer.call(mypid, {:append_engineinfo, pid, engineinfo})
         GenServer.cast(pid, :update_engineinfo)

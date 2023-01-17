@@ -401,11 +401,11 @@ defmodule FAServer do
     File.write("clusterfee.txt","")
     File.write("responsetime_average.txt","")
     File.write("clusterfee_average.txt","")
-    relayrandomseed = [{0,10},{0,10},{0,10},{5,5},{5,5},{5,5},{10,0},{10,0},{10,0}]
+    relayrandomseed = [{0,10,false},{0,10,false},{0,10,false},{5,5,false},{5,5,false},{5,5,false},{10,0,true},{10,0,true},{10,0,true}]
     _ = :rand.seed(:exsss, taskseed)
-    relayrandomseed = Enum.map(relayrandomseed, fn {engine, device} -> {engine, device, :rand.uniform 1000000} end)
+    relayrandomseed = Enum.map(relayrandomseed, fn {engine, device, flopsflag} -> {engine, device, flopsflag, :rand.uniform 1000000} end)
     _ = :rand.seed(:exsss, engineseed)
-    relayrandomseed = Enum.map(relayrandomseed, fn {engine, device, devicerandomseed} -> {engine, device, devicerandomseed, :rand.uniform 1000000} end)
+    relayrandomseed = Enum.map(relayrandomseed, fn {engine, device, flopsflag, devicerandomseed} -> {engine, device, flopsflag, devicerandomseed, :rand.uniform 1000000} end)
     GenServer.start_link(__MODULE__, %{}, name: AlgoServer)
     Enum.map(relayrandomseed, fn seed ->
       {:ok, pid} = GRServer.start_link(seed)
