@@ -110,7 +110,7 @@ defmodule FAServer do
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee)} end)
           |> Enum.map(fn {key, val1, val2, val3} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val3} else {key, elem(val1, 0), length(val2), val3} end end)
-        IO.inspect clustermap
+        #IO.inspect clustermap
         #デバッグ用標準出力↑
 
         #IO.inspect(min_taskque_cluster_pid, label: "assigned cluster")
@@ -234,7 +234,7 @@ defmodule FAServer do
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee)} end)
           |> Enum.map(fn {key, val1, val2, val3} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val3} else {key, elem(val1, 0), length(val2), val3} end end)
-        IO.inspect clustermap
+        #IO.inspect clustermap
         #デバッグ用標準出力↑
         if state.tasknum == state.tasknumlimit do
           state
@@ -365,8 +365,8 @@ defmodule FAServer do
       |> String.split("\n")
       |> List.delete("")
       |> Enum.map(fn x -> elem(Float.parse(x),0) end)
-    average_clusterfee = Enum.sum(floatdat) / length(floatdat)
-    File.write("clusterfee_average.txt",Float.to_string(average_clusterfee) <> "\n",[:append])
+    sum_clusterfee = Enum.sum(floatdat)
+    File.write("clusterfee_average.txt",Float.to_string(sum_clusterfee) <> "\n",[:append])
 
     File.write("responsetime.txt","")
     File.write("clusterfee.txt","")
@@ -380,7 +380,7 @@ defmodule FAServer do
       |> Map.delete(:tasknumlimit)
       |> Map.delete(:creating_task_flag)
       |> Map.keys()
-    Enum.map(relaypids, fn relaypid -> GenServer.call(relaypid, :initialize_taskseed) end)
+    Enum.map(relaypids, fn relaypid -> GenServer.call(relaypid, :initialize_clusterinfo_and_taskseed) end)
 
     #start_assigning
     GenServer.cast(AlgoServer, {:initialize_creating_task_flag, true})
@@ -402,6 +402,7 @@ defmodule FAServer do
     File.write("responsetime_average.txt","")
     File.write("clusterfee_average.txt","")
     relayrandomseed = [{0,10,false},{0,10,false},{0,10,false},{5,5,false},{5,5,false},{5,5,false},{10,0,true},{10,0,true},{10,0,true}]
+    #relayrandomseed = [{0,10,true},{0,10,true},{0,10,true},{5,5,true},{5,5,true},{5,5,true},{10,0,true},{10,0,true},{10,0,true}]
     #relayrandomseed = [{0,15,false},{5,20,false},{5,5,false},{5,5,false},{10,0,true},{10,0,true},{10,0,true}]
     _ = :rand.seed(:exsss, taskseed)
     relayrandomseed = Enum.map(relayrandomseed, fn {engine, device, flopsflag} -> {engine, device, flopsflag, :rand.uniform 1000000} end)

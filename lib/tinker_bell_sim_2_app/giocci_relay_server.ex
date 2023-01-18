@@ -20,7 +20,7 @@ defmodule GRServer do
     {:reply, state, state}
   end
 
-  def handle_call(:initialize_clusterinfo, _from, state) do
+  def handle_cast(:initialize_clusterinfo, state) do
     cluster_taskque = state.enginemap
       |> Map.values()
       |> Enum.map(fn x -> Map.get(x, :taskque) end)
@@ -31,7 +31,7 @@ defmodule GRServer do
       |> Enum.map(fn x -> Map.get(x, :hidden_parameter_flops) end)
       |> Enum.reduce(0, fn x, acc -> x + acc end)
     state = Map.update!(state, :clusterinfo, fn _ -> if state.enginemap == %{} do %{cluster_taskque: "no engine", cluster_enginenum: 0, cluster_response_time: {:infinity, [], :infinity, []}, cluster_fee: :infinity} else %{cluster_taskque: cluster_taskque, cluster_enginenum: Enum.count(state.enginemap), cluster_response_time: {0,[],0,[]}, cluster_fee: (cluster_flops_sum / Enum.count(state.enginemap))} end end)
-    {:reply, state, state}
+    {:noreply, state}
   end
 
   def handle_call(:update_clusterinfo, _from, state) do
@@ -187,7 +187,10 @@ defmodule GRServer do
     {:noreply, state}
   end
 
-  def handle_call(:initialize_taskseed, _from, state) do
+  def handle_call(:initialize_clusterinfo_and_taskseed, _from, state) do
+
+    GenServer.cast(self(), :initialize_clusterinfo)
+
     state = Map.update!(state, :initialize_info, fn {algonum, taskseed} -> {algonum + 1, taskseed} end)
     {algonum, taskseed} = state.initialize_info
 
@@ -239,7 +242,7 @@ defmodule GRServer do
         GenServer.cast(pid, {:set_algo, algonum})
       end)
     end
-    GenServer.call(mypid, :initialize_clusterinfo)
+    GenServer.cast(mypid, :initialize_clusterinfo)
     {:ok, mypid}
   end
 end
