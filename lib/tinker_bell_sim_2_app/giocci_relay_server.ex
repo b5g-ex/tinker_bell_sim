@@ -30,7 +30,9 @@ defmodule GRServer do
       |> Map.values()
       |> Enum.map(fn x -> Map.get(x, :hidden_parameter_flops) end)
       |> Enum.reduce(0, fn x, acc -> x + acc end)
-    state = Map.update!(state, :clusterinfo, fn _ -> if state.enginemap == %{} do %{cluster_taskque: "no engine", cluster_enginenum: 0, cluster_response_time: {:infinity, [], :infinity, []}, cluster_fee: :infinity} else %{cluster_taskque: cluster_taskque, cluster_enginenum: Enum.count(state.enginemap), cluster_response_time: {0,[],0,[]}, cluster_fee: (cluster_flops_sum / Enum.count(state.enginemap))} end end)
+    predway = 1 #応答時間予測値の計算方法
+    history_attenuation = 2.0 #応答時間予測値の計算方法2つ目における履歴情報の減衰率
+    state = Map.update!(state, :clusterinfo, fn _ -> if state.enginemap == %{} do %{cluster_taskque: "no engine", cluster_enginenum: 0, cluster_response_time: {:infinity, [], :infinity, [], predway, history_attenuation}, cluster_fee: :infinity} else %{cluster_taskque: cluster_taskque, cluster_enginenum: Enum.count(state.enginemap), cluster_response_time: {0,[],0,[], predway, history_attenuation}, cluster_fee: (cluster_flops_sum / Enum.count(state.enginemap))} end end)
     {:noreply, state}
   end
 
@@ -51,27 +53,31 @@ defmodule GRServer do
     File.write("responsetime_in_cluster.txt",Float.to_string(task_response_time_in_cluster) <> "\n",[:append])
     old_clusterinfo = Map.get(state, :clusterinfo)
     new_clusterinfo = old_clusterinfo
-      |> Map.update!(:cluster_response_time, fn {_, nowdata, _, nowhistory} ->
+      |> Map.update!(:cluster_response_time, fn {now_response_time, nowdata, now_response_time_history, nowhistory, predway, history_attenuation} ->
+          case predway do
+            0 ->
+              newdata = if length(nowdata) < 3 do
+                nowdata ++ [task_response_time_in_cluster]
+              else
+                [_ | tl] = nowdata
+                tl ++ [task_response_time_in_cluster]
+              end
+              new_response_time = Enum.sum(newdata) / length(newdata)
 
-          newdata = if length(nowdata) < 3 do
-            nowdata ++ [task_response_time_in_cluster]
-          else
-            [_ | tl] = nowdata
-            tl ++ [task_response_time_in_cluster]
+              newhistory = if length(nowhistory) < 30 do
+                nowhistory ++ [task_response_time_in_cluster]
+              else
+                [_ | tl] = nowhistory
+                tl ++ [task_response_time_in_cluster]
+              end
+              new_response_time_history = Enum.sum(newhistory) / length(newhistory)
+
+              new_response_time = if old_clusterinfo.cluster_taskque == [] do new_response_time_history else new_response_time end
+
+              {new_response_time, newdata, new_response_time_history, newhistory, predway, history_attenuation}
+            1 ->
+              {task_response_time_in_cluster + now_response_time / history_attenuation, nowdata, now_response_time_history, nowhistory, predway, history_attenuation}
           end
-          new_response_time = Enum.sum(newdata) / length(newdata)
-
-          newhistory = if length(nowhistory) < 30 do
-            nowhistory ++ [task_response_time_in_cluster]
-          else
-            [_ | tl] = nowhistory
-            tl ++ [task_response_time_in_cluster]
-          end
-          new_response_time_history = Enum.sum(newhistory) / length(newhistory)
-
-          new_response_time = if old_clusterinfo.cluster_taskque == [] do new_response_time_history else new_response_time end
-
-          {new_response_time, newdata, new_response_time_history, newhistory}
         end)
     state = Map.update!(state, :clusterinfo, fn _ -> new_clusterinfo end)
     GenServer.cast(self(), {:record_responsetime, processed_task})

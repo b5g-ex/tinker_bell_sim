@@ -33,10 +33,10 @@ defmodule EndDevice do
         # bandwidth     R-R通信帯域幅最大化
         # responsetime  応答時間最小化
         # clusterfee    Cluster利用コスト最適化（応答時間予測値が55行目のrestime_limitを超えないClusterの中でコスト最小のものを選択）
-        x when 0 <= x and x <= 1 -> "taskque"
+        x when 3 <= x and x <= 3 -> "taskque"
         x when 2 <= x and x <= 2 -> "delay"
-        x when 3 <= x and x <= 3 -> "bandwidth"
-        x when 4 <= x and x <= 4 -> "responsetime"
+        #x when 3 <= x and x <= 3 -> "bandwidth"
+        x when 0 <= x and x <= 1 -> "responsetime"
         x when 5 <= x and x <= 5 -> "clusterfee"
         _ -> raise "end" #指定回数の試行が終わったらエラーを吐かせて止めます
       end
