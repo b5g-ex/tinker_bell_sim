@@ -16,6 +16,7 @@ defmodule FAServer do
   end
 
   def handle_call({:append_relaynetwork_feature_table, relaynetworkseed}, _from, state) do
+    """
     device_connected_relay = state
       |> Enum.map(fn {key, val} -> {key, Map.get(val, :devicemap)} end)
       |> Enum.map(fn {key, val} -> {key, length(Map.values(val))} end)
@@ -27,7 +28,11 @@ defmodule FAServer do
       |> Enum.map(fn {key, val} -> {key, length(Map.values(val))} end)
       |> Enum.map(fn {key, val} -> if val == 0 do {key, False} else {key, True} end end)
       |> Enum.reduce([], fn {key, val}, acc -> if val == True do acc ++ [key] else acc end end)
+    """
 
+    relaypids = Map.keys(state)
+
+    """
     relaynetwork_bandwidth = device_connected_relay
       |> Enum.reduce(%{}, fn dcr_pid, acc -> Map.put_new(acc, dcr_pid, %{}) end)
       |> Enum.map(fn {key, _} ->
@@ -36,6 +41,16 @@ defmodule FAServer do
       |> Enum.reduce(%{}, fn dcr_pid, acc -> Map.put_new(acc, dcr_pid, %{}) end)
       |> Enum.map(fn {key, _} ->
         {key, Enum.reduce(engine_connected_relay, %{}, fn ecr_pid, acc -> Map.put_new(acc, ecr_pid, if key == ecr_pid do 0 else 5 + :rand.uniform(20) end) end)} end)
+    """
+
+    relaynetwork_bandwidth = relaypids
+      |> Enum.reduce(%{}, fn dcr_pid, acc -> Map.put_new(acc, dcr_pid, %{}) end)
+      |> Enum.map(fn {key, _} ->
+        {key, Enum.reduce(relaypids, %{}, fn ecr_pid, acc -> Map.put_new(acc, ecr_pid, if key == ecr_pid do 9999 else 500 + :rand.uniform(500) end) end)} end)
+    relaynetwork_delay = relaypids
+      |> Enum.reduce(%{}, fn dcr_pid, acc -> Map.put_new(acc, dcr_pid, %{}) end)
+      |> Enum.map(fn {key, _} ->
+        {key, Enum.reduce(relaypids, %{}, fn ecr_pid, acc -> Map.put_new(acc, ecr_pid, if key == ecr_pid do 0 else 5 + :rand.uniform(20) end) end)} end)
 
     relaynetwork_bandwidth = Enum.reduce(relaynetwork_bandwidth, %{}, fn {key, val}, acc -> Map.put_new(acc, key, val) end)
     relaynetwork_delay = Enum.reduce(relaynetwork_delay, %{}, fn {key, val}, acc -> Map.put_new(acc, key, val) end)
@@ -128,15 +143,58 @@ defmodule FAServer do
               end)
         end
         if state.tasknum > state.tasknumlimit do
-          {:reply, "tasknumlimit", state}
+          {:reply, {"tasknumlimit", "tasknumlimit"}, state}
         else
-          {:reply, min_taskque_cluster_pid, state}
+          delaymap = state.relaynetwork_delay
+            |> Map.get(device_connected_relaypid)
+            |> Enum.map(fn {destination_pid, halfway_delay} ->
+              backway_delay = state.relaynetwork_delay
+              |> Map.get(destination_pid)
+              |> Map.get(device_connected_relaypid)
+                {destination_pid, {halfway_delay, backway_delay}}
+              end)
+            |> Enum.reduce(%{}, fn {destination_pid, delay}, acc -> Map.put_new(acc, destination_pid, delay) end)
+          rtr_delay = Map.get(delaymap, min_taskque_cluster_pid)
+          {:reply, {min_taskque_cluster_pid, rtr_delay}, state}
         end
 
       "delay" ->
-        delaymap = Map.get(state.relaynetwork_delay, device_connected_relaypid)
-        min_delay_cluster_pid = delaymap
-          |> Enum.min_by(fn {_, val} -> val end)
+        delaymap = state.relaynetwork_delay
+          |> Map.get(device_connected_relaypid)
+          |> Enum.map(fn {destination_pid, halfway_delay} ->
+            backway_delay = state.relaynetwork_delay
+            |> Map.get(destination_pid)
+            |> Map.get(device_connected_relaypid)
+              {destination_pid, {halfway_delay, backway_delay}}
+            end)
+          |> Enum.reduce(%{}, fn {destination_pid, delay}, acc -> Map.put_new(acc, destination_pid, delay) end)
+
+        relaypids = state
+          |> Map.delete(:relaynetwork_bandwidth)
+          |> Map.delete(:relaynetwork_delay)
+          |> Map.delete(:tasknum)
+          |> Map.delete(:tasknumlimit)
+          |> Map.delete(:creating_task_flag)
+          |> Map.keys()
+
+        noengine_relaypids = Enum.reduce(relaypids, [], fn relaypid, acc ->
+          enginenum = state
+            |> Map.get(relaypid)
+            |> Map.get(:enginemap)
+            |> Map.keys()
+            |> length()
+          if enginenum == 0 do
+            acc ++ [relaypid]
+          else
+            acc
+          end
+        end)
+        cluster_delaymap = Map.drop(delaymap, noengine_relaypids)
+        IO.inspect noengine_relaypids
+        IO.inspect cluster_delaymap
+
+        min_delay_cluster_pid = cluster_delaymap
+          |> Enum.min_by(fn {_, {val1, val2}} -> val1 + val2 end)
           |> elem(0)
 
         #デバッグ用標準出力↓
@@ -167,13 +225,14 @@ defmodule FAServer do
               end)
         end
         if state.tasknum > state.tasknumlimit do
-          {:reply, "tasknumlimit", state}
+          {:reply, {"tasknumlimit", "tasknumlimit"}, state}
         else
-          {:reply, min_delay_cluster_pid, state}
+          rtr_delay = Map.get(delaymap, min_delay_cluster_pid)
+          {:reply, {min_delay_cluster_pid, rtr_delay}, state}
         end
 
       "bandwidth" ->
-        bandwidthmap = Map.get(state.relaynetwork_bandwidth, device_connected_relaypid)
+        bandwidthmap = Map.get(state.relaynetwork_bandwidth, device_connected_relaypid) #still halfway!
         max_bandwidth_cluster_pid = bandwidthmap
           |> Enum.max_by(fn {_, val} -> val end)
           |> elem(0)
@@ -203,9 +262,19 @@ defmodule FAServer do
             |> Enum.map(fn pid -> GenServer.cast(pid, :stop_assigning) end)
         end
         if state.tasknum > state.tasknumlimit do
-          {:reply, "tasknumlimit", state}
+          {:reply, {"tasknumlimit", "tasknumlimit"}, state}
         else
-          {:reply, max_bandwidth_cluster_pid, state}
+          delaymap = state.relaynetwork_delay
+            |> Map.get(device_connected_relaypid)
+            |> Enum.map(fn {destination_pid, halfway_delay} ->
+              backway_delay = state.relaynetwork_delay
+              |> Map.get(destination_pid)
+              |> Map.get(device_connected_relaypid)
+                {destination_pid, {halfway_delay, backway_delay}}
+              end)
+            |> Enum.reduce(%{}, fn {destination_pid, delay}, acc -> Map.put_new(acc, destination_pid, delay) end)
+          rtr_delay = Map.get(delaymap, max_bandwidth_cluster_pid)
+          {:reply, {max_bandwidth_cluster_pid, rtr_delay}, state}
         end
 
       "responsetime" ->
@@ -218,9 +287,21 @@ defmodule FAServer do
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time)} end)
           |> Enum.map(fn {key, val} -> {key, elem(val, 0)} end)
-        delaymap = Map.get(state.relaynetwork_delay, device_connected_relaypid)
+        delaymap = state.relaynetwork_delay
+          |> Map.get(device_connected_relaypid)
+          |> Enum.map(fn {destination_pid, halfway_delay} ->
+            backway_delay = state.relaynetwork_delay
+            |> Map.get(destination_pid)
+            |> Map.get(device_connected_relaypid)
+              {destination_pid, {halfway_delay, backway_delay}}
+            end)
+          |> Enum.reduce(%{}, fn {destination_pid, delay}, acc -> Map.put_new(acc, destination_pid, delay) end)
         min_responsetime_cluster_pid = cluster_responsetime_in_cluster
-          |> Enum.map(fn {key, val} -> if val == :infinity do {key, val} else {key, val + Map.get(delaymap, key)} end end)
+          |> Enum.map(fn {key, val} -> if val == :infinity do {key, val} else
+                rtr_delays = Map.get(delaymap, key)
+                {key, val + elem(rtr_delays, 0) + elem(rtr_delays, 1)}
+              end
+            end)
           |> Enum.min_by(fn {_, val} -> if val == :infinity do :infinity else val + (:rand.uniform(100) - 1) / 100 end end) #同率1位をランダムに選択したい
           |> elem(0)
 
@@ -247,9 +328,10 @@ defmodule FAServer do
             |> Enum.map(fn pid -> GenServer.cast(pid, :stop_assigning) end)
         end
         if state.tasknum > state.tasknumlimit do
-          {:reply, "tasknumlimit", state}
+          {:reply, {"tasknumlimit", "tasknumlimit"}, state}
         else
-          {:reply, min_responsetime_cluster_pid, state}
+          rtr_delay = Map.get(delaymap, min_responsetime_cluster_pid)
+          {:reply, {min_responsetime_cluster_pid, rtr_delay}, state}
         end
 
       "clusterfee" ->
@@ -262,16 +344,25 @@ defmodule FAServer do
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_fee)} end)
           |> Enum.map(fn {key, val1, val2} -> {key, elem(val1, 0), val2} end)
-        delaymap = Map.get(state.relaynetwork_delay, device_connected_relaypid)
+        delaymap = state.relaynetwork_delay
+          |> Map.get(device_connected_relaypid)
+          |> Enum.map(fn {destination_pid, halfway_delay} ->
+            backway_delay = state.relaynetwork_delay
+            |> Map.get(destination_pid)
+            |> Map.get(device_connected_relaypid)
+              {destination_pid, {halfway_delay, backway_delay}}
+            end)
+          |> Enum.reduce(%{}, fn {destination_pid, delay}, acc -> Map.put_new(acc, destination_pid, delay) end)
         cluster_responsetime_and_fee = cluster_responsetime_and_fee_in_cluster
           |> Enum.map(fn {key, restime, fee} ->
               if restime == :infinity do
                 {key, :infinity, :infinity}
               else
-                if restime + Map.get(delaymap, key) >= task.restime_limit do
-                  {key, restime + Map.get(delaymap, key), :infinity}
+                rtr_delays = Map.get(delaymap, key)
+                if restime + elem(rtr_delays, 0) + elem(rtr_delays, 1) >= task.restime_limit do
+                  {key, restime + elem(rtr_delays, 0) + elem(rtr_delays, 1), :infinity}
                 else
-                  {key, restime + Map.get(delaymap, key), fee}
+                  {key, restime + elem(rtr_delays, 0) + elem(rtr_delays, 1), fee}
                 end
               end
             end)
@@ -304,9 +395,10 @@ defmodule FAServer do
             |> Enum.map(fn pid -> GenServer.cast(pid, :stop_assigning) end)
         end
         if state.tasknum > state.tasknumlimit do
-          {:reply, "tasknumlimit", state}
+          {:reply, {"tasknumlimit", "tasknumlimit"}, state}
         else
-          {:reply, opt_fee_cluster_pid, state}
+          rtr_delay = Map.get(delaymap, opt_fee_cluster_pid)
+          {:reply, {opt_fee_cluster_pid, rtr_delay}, state}
         end
 
     end
@@ -352,6 +444,14 @@ defmodule FAServer do
   end
 
   def handle_cast(:initialize_parameters, state) do
+    {:ok, strdat} = File.read("responsetime_in_cluster.txt")
+    floatdat = strdat
+      |> String.split("\n")
+      |> List.delete("")
+      |> Enum.map(fn x -> elem(Float.parse(x),0) end)
+    average_restime = Enum.sum(floatdat) / length(floatdat)
+    File.write("responsetime_in_cluster_average.txt",Float.to_string(average_restime) <> "\n",[:append])
+
     {:ok, strdat} = File.read("responsetime.txt")
     floatdat = strdat
       |> String.split("\n")
@@ -368,6 +468,7 @@ defmodule FAServer do
     sum_clusterfee = Enum.sum(floatdat)
     File.write("clusterfee_average.txt",Float.to_string(sum_clusterfee) <> "\n",[:append])
 
+    File.write("responsetime_in_cluster.txt","")
     File.write("responsetime.txt","")
     File.write("clusterfee.txt","")
 
@@ -397,8 +498,10 @@ defmodule FAServer do
 
   #Client API
   def start_link(taskseed, engineseed, tasknumlimit) do
+    File.write("responsetime_in_cluster.txt","")
     File.write("responsetime.txt","")
     File.write("clusterfee.txt","")
+    File.write("responsetime_in_cluster_average.txt","")
     File.write("responsetime_average.txt","")
     File.write("clusterfee_average.txt","")
     relayrandomseed = [{0,10,false},{0,10,false},{0,10,false},{5,5,false},{5,5,false},{5,5,false},{10,0,true},{10,0,true},{10,0,true}]

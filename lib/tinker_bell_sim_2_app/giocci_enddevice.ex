@@ -33,11 +33,11 @@ defmodule EndDevice do
         # bandwidth     R-R通信帯域幅最大化
         # responsetime  応答時間最小化
         # clusterfee    Cluster利用コスト最適化（応答時間予測値が55行目のrestime_limitを超えないClusterの中でコスト最小のものを選択）
-        x when 0 <= x and x <= 1 -> "taskque"
-        x when 2 <= x and x <= 2 -> "delay"
-        x when 3 <= x and x <= 3 -> "bandwidth"
-        x when 4 <= x and x <= 4 -> "responsetime"
-        x when 5 <= x and x <= 5 -> "clusterfee"
+        x when 2 <= x and x <= 2 -> "taskque"
+        x when 0 <= x and x <= 1 -> "delay"
+        #x when 3 <= x and x <= 3 -> "bandwidth"
+        x when 3 <= x and x <= 3 -> "responsetime"
+        x when 4 <= x and x <= 4 -> "clusterfee"
         _ -> raise "end" #指定回数の試行が終わったらエラーを吐かせて止めます
       end
     end)
@@ -52,7 +52,7 @@ defmodule EndDevice do
     #create task ↓
     florand = :rand.uniform 5000
     #File.write("outputflo2.txt",Integer.to_string(florand) <> "\n",[:append])
-    task = %{flo: 2500 + florand, algo: state.algo, restime_limit: 10000} #restime_limitはCluster利用コスト最適化における応答時間の閾値
+    task = %{flo: 2500 + florand, task_produced_time: :erlang.monotonic_time(), algo: state.algo, restime_limit: 10000} #restime_limitはCluster利用コスト最適化における応答時間の閾値
     #IO.inspect(self(), label: "task request from Device") 標準出力
     GenServer.call(state.relaypid, {:assign_request, self(), task})
 

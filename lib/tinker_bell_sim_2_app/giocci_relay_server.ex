@@ -47,8 +47,8 @@ defmodule GRServer do
     {:reply, state, state}
   end
 
-  def handle_cast({:send_task_response_time_in_cluster, task_response_time_in_cluster}, state) do
-    File.write("responsetime.txt",Float.to_string(task_response_time_in_cluster) <> "\n",[:append])
+  def handle_cast({:send_task_response_time_in_cluster, processed_task, task_response_time_in_cluster}, state) do
+    File.write("responsetime_in_cluster.txt",Float.to_string(task_response_time_in_cluster) <> "\n",[:append])
     old_clusterinfo = Map.get(state, :clusterinfo)
     new_clusterinfo = old_clusterinfo
       |> Map.update!(:cluster_response_time, fn {_, nowdata, _, nowhistory} ->
@@ -74,6 +74,18 @@ defmodule GRServer do
           {new_response_time, newdata, new_response_time_history, newhistory}
         end)
     state = Map.update!(state, :clusterinfo, fn _ -> new_clusterinfo end)
+    GenServer.cast(self(), {:record_responsetime, processed_task})
+    {:noreply, state}
+  end
+
+  def handle_cast({:record_responsetime, processed_task}, state) do
+    #帰りの通信遅延
+    rtr_delay_sleep = Task.async(fn -> :timer.sleep(elem(elem(processed_task, 2), 1)); :ok end)
+    Task.await(rtr_delay_sleep, :infinity)
+
+    task_processed_time = :erlang.monotonic_time()
+    task_responsetime = (task_processed_time - elem(processed_task, 1)) / :math.pow(10,6)
+    File.write("responsetime.txt",Float.to_string(task_responsetime) <> "\n",[:append])
     {:noreply, state}
   end
 
@@ -106,7 +118,7 @@ defmodule GRServer do
 
   def handle_call({:assign_request, devicepid, task}, _from, state) do
 
-    assigned_cluster_pid = GenServer.call(AlgoServer, {:assign_algorithm, devicepid, self(), task})
+    {assigned_cluster_pid, rtr_delay} = GenServer.call(AlgoServer, {:assign_algorithm, devicepid, self(), task})
     if assigned_cluster_pid == "tasknumlimit" do
       {:reply, state, state}
     else
@@ -120,16 +132,19 @@ defmodule GRServer do
           |> Enum.min_by(fn {key, val} -> val end)
           |> elem(0)
 
-        GenServer.cast(assigned_engine_pid, {:assign_task_to_engine, task})
+        #行きの通信遅延
+        rtr_delay_sleep = Task.async(fn -> :timer.sleep(elem(rtr_delay, 0)); :ok end)
+        Task.await(rtr_delay_sleep, :infinity)
+        GenServer.cast(assigned_engine_pid, {:assign_task_to_engine, task, rtr_delay})
 
       else
-        GenServer.cast(assigned_cluster_pid, {:assign_task_in_cluster, task})
+        GenServer.cast(assigned_cluster_pid, {:assign_task_in_cluster, task, rtr_delay})
       end
       {:reply, state, state}
     end
   end
 
-  def handle_cast({:assign_task_in_cluster,task}, state) do
+  def handle_cast({:assign_task_in_cluster, task, rtr_delay}, state) do
     File.write("clusterfee.txt", Float.to_string(state.clusterinfo.cluster_fee) <> "\n",[:append])
     #クラスター内assignはタスクキュー数のみで決定
     engine_taskque_scores = state.enginemap
@@ -139,7 +154,10 @@ defmodule GRServer do
       |> Enum.min_by(fn {key, val} -> val end)
       |> elem(0)
 
-    GenServer.cast(assigned_engine_pid, {:assign_task_to_engine, task})
+    #行きの通信遅延
+    rtr_delay_sleep = Task.async(fn -> :timer.sleep(elem(rtr_delay, 0)); :ok end)
+    Task.await(rtr_delay_sleep, :infinity)
+    GenServer.cast(assigned_engine_pid, {:assign_task_to_engine, task, rtr_delay})
 
     {:noreply, state}
   end
