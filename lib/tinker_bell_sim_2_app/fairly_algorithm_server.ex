@@ -115,6 +115,13 @@ defmodule FAServer do
           |> Enum.min_by(fn {_, val} -> if val == :infinity do :infinity else val + (:rand.uniform(100) - 1) / 100 end end) #同率1位をランダムに選択したい
           |> elem(0)
 
+        #algoserver内のcluster_taskqueを更新
+        old_relayinfo = Map.get(state, min_taskque_cluster_pid)
+        new_clusterinfo = old_relayinfo.clusterinfo
+          |> Map.update!(:cluster_taskque, fn pre -> pre ++ [task.flo] end)
+        new_relayinfo = Map.update!(old_relayinfo, :clusterinfo, fn _ -> new_clusterinfo end)
+        state = Map.update!(state, min_taskque_cluster_pid, fn _ -> new_relayinfo end)
+
         #デバッグ用標準出力↓
         clustermap = state
           |> Map.delete(:relaynetwork_bandwidth)
@@ -125,7 +132,7 @@ defmodule FAServer do
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee)} end)
           |> Enum.map(fn {key, val1, val2, val3} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val3} else {key, elem(val1, 0), length(val2), val3} end end)
-        #IO.inspect clustermap
+        IO.inspect clustermap
         #デバッグ用標準出力↑
 
         #IO.inspect(min_taskque_cluster_pid, label: "assigned cluster")
