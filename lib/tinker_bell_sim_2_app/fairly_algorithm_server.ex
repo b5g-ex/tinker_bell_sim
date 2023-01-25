@@ -475,9 +475,18 @@ defmodule FAServer do
     sum_clusterfee = Enum.sum(floatdat)
     File.write("clusterfee_average.txt",Float.to_string(sum_clusterfee) <> "\n",[:append])
 
+    {:ok, strdat} = File.read("clusterfee_processtime.txt")
+    floatdat = strdat
+      |> String.split("\n")
+      |> List.delete("")
+      |> Enum.map(fn x -> elem(Float.parse(x),0) end)
+    sum_clusterfee = Enum.sum(floatdat)
+    File.write("clusterfee_processtime_average.txt",Float.to_string(sum_clusterfee) <> "\n",[:append])
+
     File.write("responsetime_in_cluster.txt","")
     File.write("responsetime.txt","")
     File.write("clusterfee.txt","")
+    File.write("clusterfee_processtime.txt","")
 
     #パラメータを初期化して次の実験へ
     GenServer.cast(AlgoServer, :initialize_tasknum)
@@ -508,9 +517,11 @@ defmodule FAServer do
     File.write("responsetime_in_cluster.txt","")
     File.write("responsetime.txt","")
     File.write("clusterfee.txt","")
+    File.write("clusterfee_processtime.txt","")
     File.write("responsetime_in_cluster_average.txt","")
     File.write("responsetime_average.txt","")
     File.write("clusterfee_average.txt","")
+    File.write("clusterfee_processtime_average.txt","")
     relayrandomseed = [{0,10,false},{0,10,false},{0,10,false},{5,5,false},{5,5,false},{5,5,false},{10,0,true},{10,0,true},{10,0,true}]
     #relayrandomseed = [{0,10,true},{0,10,true},{0,10,true},{5,5,true},{5,5,true},{5,5,true},{10,0,true},{10,0,true},{10,0,true}]
     #relayrandomseed = [{0,15,false},{5,20,false},{5,5,false},{5,5,false},{10,0,true},{10,0,true},{10,0,true}]
