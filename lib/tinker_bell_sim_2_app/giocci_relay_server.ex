@@ -31,7 +31,7 @@ defmodule GRServer do
       |> Enum.map(fn x -> Map.get(x, :hidden_parameter_flops) end)
       |> Enum.reduce(0, fn x, acc -> x + acc end)
     predway = 1 #応答時間予測値の計算方法
-    history_attenuation = 2.0 #応答時間予測値の計算方法2つ目における履歴情報の減衰率
+    history_attenuation = 4.0 #応答時間予測値の計算方法2つ目における履歴情報の減衰率
     state = Map.update!(state, :clusterinfo, fn _ -> if state.enginemap == %{} do %{cluster_taskque: "no engine", cluster_enginenum: 0, cluster_response_time: {:infinity, [], :infinity, [], predway, history_attenuation}, cluster_fee: :infinity} else %{cluster_taskque: cluster_taskque, cluster_enginenum: Enum.count(state.enginemap), cluster_response_time: {0,[],0,[], predway, history_attenuation}, cluster_fee: (cluster_flops_sum / Enum.count(state.enginemap))} end end)
     {:noreply, state}
   end
