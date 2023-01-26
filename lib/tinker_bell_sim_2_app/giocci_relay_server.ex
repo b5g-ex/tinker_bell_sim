@@ -137,8 +137,11 @@ defmodule GRServer do
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :taskque)} end)
           |> Enum.map(fn {key, val} -> {key, length(val)} end)
         assigned_engine_pid = engine_taskque_scores
-          |> Enum.min_by(fn {key, val} -> val end)
+          |> Enum.min_by(fn {key, val} -> val + (:rand.uniform(100) - 1) / 100 end)
           |> elem(0)
+
+        #relayserver内のengine_taskqueを更新
+        GenServer.cast(self(), {:update_engine_taskque_in_enginemap, task, assigned_engine_pid})
 
         #行きの通信遅延
         rtr_delay_sleep = Task.async(fn -> :timer.sleep(elem(rtr_delay, 0)); :ok end)
@@ -159,14 +162,29 @@ defmodule GRServer do
       |> Enum.map(fn {key, val} -> {key, Map.get(val, :taskque)} end)
       |> Enum.map(fn {key, val} -> {key, length(val)} end)
     assigned_engine_pid = engine_taskque_scores
-      |> Enum.min_by(fn {key, val} -> val end)
+      |> Enum.min_by(fn {key, val} -> val + (:rand.uniform(100) - 1) / 100 end)
       |> elem(0)
+
+    #relayserver内のengine_taskqueを更新
+    GenServer.cast(self(), {:update_engine_taskque_in_enginemap, task, assigned_engine_pid})
 
     #行きの通信遅延
     rtr_delay_sleep = Task.async(fn -> :timer.sleep(elem(rtr_delay, 0)); :ok end)
     Task.await(rtr_delay_sleep, :infinity)
     GenServer.cast(assigned_engine_pid, {:assign_task_to_engine, task, rtr_delay})
 
+    {:noreply, state}
+  end
+
+  def handle_cast({:update_engine_taskque_in_enginemap, task, assigned_engine_pid}, state) do
+    #relayserver内のengine_taskqueを更新
+    old_engineinfo = state
+      |> Map.get(:enginemap)
+      |> Map.get(assigned_engine_pid)
+    new_engineinfo = old_engineinfo
+      |> Map.update!(:taskque, fn pre -> pre ++ [task.flo] end)
+    new_enginemap = Map.update!(state.enginemap, assigned_engine_pid, fn _ -> new_engineinfo end)
+    state = Map.update!(state, :enginemap, fn _ -> new_enginemap end)
     {:noreply, state}
   end
 
