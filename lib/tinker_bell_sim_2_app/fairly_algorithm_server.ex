@@ -101,6 +101,53 @@ defmodule FAServer do
     #IO.inspect state.tasknum
     #IO.inspect state.creating_task_flag
 
+    #algo3,4をresponsetime履歴が集まるまでtaskqueにする
+    task = Map.update!(task, :algo, fn algorithm -> case algorithm do
+        "taskque" -> "taskque"
+
+        "delay" -> "delay"
+
+        "bandwidth" -> "bandwidth"
+
+        "responsetime" ->
+          min_cluster_responsetime_in_cluster = state
+            |> Map.delete(:relaynetwork_bandwidth)
+            |> Map.delete(:relaynetwork_delay)
+            |> Map.delete(:tasknum)
+            |> Map.delete(:tasknumlimit)
+            |> Map.delete(:creating_task_flag)
+            |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
+            |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time)} end)
+            |> Enum.map(fn {key, val} -> {key, elem(val, 0)} end)
+            |> Enum.min()
+          if min_cluster_responsetime_in_cluster == 0 do
+            "taskque"
+          else
+            "responsetime"
+          end
+
+        "clusterfee" ->
+          min_cluster_responsetime_in_cluster = state
+            |> Map.delete(:relaynetwork_bandwidth)
+            |> Map.delete(:relaynetwork_delay)
+            |> Map.delete(:tasknum)
+            |> Map.delete(:tasknumlimit)
+            |> Map.delete(:creating_task_flag)
+            |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
+            |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time)} end)
+            |> Enum.map(fn {key, val} -> {key, elem(val, 0)} end)
+            |> Enum.min()
+          if min_cluster_responsetime_in_cluster == 0 do
+            "taskque"
+          else
+            "clusterfee"
+          end
+
+        _ -> raise "invalid task_algo in FAServer"
+
+      end
+    end)
+
     case task.algo do
       "taskque" ->
         clustermap = state
