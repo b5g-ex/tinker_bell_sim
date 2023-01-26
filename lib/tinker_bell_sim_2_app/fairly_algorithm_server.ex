@@ -80,6 +80,7 @@ defmodule FAServer do
       |> Map.delete(:tasknum)
       |> Map.delete(:tasknumlimit)
       |> Map.delete(:creating_task_flag)
+      |> Map.delete(:costmodel)
       |> Map.keys()
       |> Enum.reduce(%{}, fn relaypid, acc ->
           devicemap = state
@@ -92,6 +93,11 @@ defmodule FAServer do
           end
         end)
     state = Map.update(state, :creating_task_flag, relay_handling_task_flag, fn _ -> relay_handling_task_flag end)
+    {:noreply, state}
+  end
+
+  def handle_cast({:append_costmodel, costmodel}, state) do
+    state = Map.put_new(state, :costmodel, costmodel)
     {:noreply, state}
   end
 
@@ -116,32 +122,20 @@ defmodule FAServer do
             |> Map.delete(:tasknum)
             |> Map.delete(:tasknumlimit)
             |> Map.delete(:creating_task_flag)
+            |> Map.delete(:costmodel)
             |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
             |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time)} end)
             |> Enum.map(fn {key, val} -> {key, elem(val, 0)} end)
-            |> Enum.min()
+            |> Enum.min_by(fn {_, val} -> val end)
+            |> elem(1)
           if min_cluster_responsetime_in_cluster == 0 do
+            IO.inspect "taskque"
             "taskque"
           else
             "responsetime"
           end
 
-        "clusterfee" ->
-          min_cluster_responsetime_in_cluster = state
-            |> Map.delete(:relaynetwork_bandwidth)
-            |> Map.delete(:relaynetwork_delay)
-            |> Map.delete(:tasknum)
-            |> Map.delete(:tasknumlimit)
-            |> Map.delete(:creating_task_flag)
-            |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
-            |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time)} end)
-            |> Enum.map(fn {key, val} -> {key, elem(val, 0)} end)
-            |> Enum.min()
-          if min_cluster_responsetime_in_cluster == 0 do
-            "taskque"
-          else
-            "clusterfee"
-          end
+        "clusterfee" -> "clusterfee"
 
         _ -> raise "invalid task_algo in FAServer"
 
@@ -156,10 +150,11 @@ defmodule FAServer do
           |> Map.delete(:tasknum)
           |> Map.delete(:tasknumlimit)
           |> Map.delete(:creating_task_flag)
+          |> Map.delete(:costmodel)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
-        cluster_taskque_num = Enum.map(clustermap, fn {key, val} -> {key, if val.cluster_taskque == "no engine" do :infinity else length(val.cluster_taskque) end} end)
+        cluster_taskque_num = Enum.map(clustermap, fn {key, val} -> {key, if val.cluster_taskque == "no engine" do :infinity else length(val.cluster_taskque) / val.cluster_enginenum end} end)
         min_taskque_cluster_pid = cluster_taskque_num
-          |> Enum.min_by(fn {_, val} -> if val == :infinity do :infinity else val + (:rand.uniform(100) - 1) / 100 end end) #同率1位をランダムに選択したい
+          |> Enum.min_by(fn {_, val} -> if val == :infinity do :infinity else val + (:rand.uniform(100) - 1) / 10000 end end) #同率1位をランダムに選択したい
           |> elem(0)
 
         #algoserver内のcluster_taskqueを更新
@@ -176,9 +171,10 @@ defmodule FAServer do
           |> Map.delete(:tasknum)
           |> Map.delete(:tasknumlimit)
           |> Map.delete(:creating_task_flag)
+          |> Map.delete(:costmodel)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
-          |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee)} end)
-          |> Enum.map(fn {key, val1, val2, val3} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val3} else {key, elem(val1, 0), length(val2), val3} end end)
+          |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee), Map.get(val, :cluster_fee_magnification), Map.get(val, :cluster_enginenum)} end)
+          |> Enum.map(fn {key, val1, val2, val3, val4, val5} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val2, val3, val3, val4, val5} else {key, elem(val1, 0), length(val2), length(val2)/val5, val3 * val4, val3, val4, val5} end end)
         IO.inspect clustermap
         #デバッグ用標準出力↑
 
@@ -190,6 +186,7 @@ defmodule FAServer do
             |> Map.delete(:tasknum)
             |> Map.delete(:tasknumlimit)
             |> Map.delete(:creating_task_flag)
+            |> Map.delete(:costmodel)
             |> Map.keys()
             |> Enum.map(fn pid ->
                 GenServer.cast(pid, :stop_assigning)
@@ -229,6 +226,7 @@ defmodule FAServer do
           |> Map.delete(:tasknum)
           |> Map.delete(:tasknumlimit)
           |> Map.delete(:creating_task_flag)
+          |> Map.delete(:costmodel)
           |> Map.keys()
 
         noengine_relaypids = Enum.reduce(relaypids, [], fn relaypid, acc ->
@@ -258,10 +256,11 @@ defmodule FAServer do
           |> Map.delete(:tasknum)
           |> Map.delete(:tasknumlimit)
           |> Map.delete(:creating_task_flag)
+          |> Map.delete(:costmodel)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
-          |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee)} end)
-          |> Enum.map(fn {key, val1, val2, val3} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val3} else {key, elem(val1, 0), length(val2), val3} end end)
-        #IO.inspect clustermap
+          |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee), Map.get(val, :cluster_fee_magnification), Map.get(val, :cluster_enginenum)} end)
+          |> Enum.map(fn {key, val1, val2, val3, val4, val5} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val2, val3, val3, val4, val5} else {key, elem(val1, 0), length(val2), length(val2)/val5, val3 * val4, val3, val4, val5} end end)
+        IO.inspect clustermap
         #デバッグ用標準出力↑
 
         #IO.inspect(min_delay_cluster_pid, label: "assigned cluster")
@@ -272,6 +271,7 @@ defmodule FAServer do
             |> Map.delete(:tasknum)
             |> Map.delete(:tasknumlimit)
             |> Map.delete(:creating_task_flag)
+            |> Map.delete(:costmodel)
             |> Map.keys()
             |> Enum.map(fn pid ->
                 GenServer.cast(pid, :stop_assigning)
@@ -298,9 +298,10 @@ defmodule FAServer do
           |> Map.delete(:tasknum)
           |> Map.delete(:tasknumlimit)
           |> Map.delete(:creating_task_flag)
+          |> Map.delete(:costmodel)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
-          |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee)} end)
-          |> Enum.map(fn {key, val1, val2, val3} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val3} else {key, elem(val1, 0), length(val2), val3} end end)
+          |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee), Map.get(val, :cluster_fee_magnification), Map.get(val, :cluster_enginenum)} end)
+          |> Enum.map(fn {key, val1, val2, val3, val4, val5} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val2, val3, val3, val4, val5} else {key, elem(val1, 0), length(val2), length(val2)/val5, val3 * val4, val3, val4, val5} end end)
         #IO.inspect clustermap
         #デバッグ用標準出力↑
 
@@ -312,6 +313,7 @@ defmodule FAServer do
             |> Map.delete(:tasknum)
             |> Map.delete(:tasknumlimit)
             |> Map.delete(:creating_task_flag)
+            |> Map.delete(:costmodel)
             |> Map.keys()
             |> Enum.map(fn pid -> GenServer.cast(pid, :stop_assigning) end)
         end
@@ -338,6 +340,7 @@ defmodule FAServer do
           |> Map.delete(:tasknum)
           |> Map.delete(:tasknumlimit)
           |> Map.delete(:creating_task_flag)
+          |> Map.delete(:costmodel)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time)} end)
           |> Enum.map(fn {key, val} -> {key, elem(val, 0)} end)
@@ -356,7 +359,7 @@ defmodule FAServer do
                 {key, val + elem(rtr_delays, 0) + elem(rtr_delays, 1)}
               end
             end)
-          |> Enum.min_by(fn {_, val} -> if val == :infinity do :infinity else val + (:rand.uniform(100) - 1) / 100 end end) #同率1位をランダムに選択したい
+          |> Enum.min_by(fn {_, val} -> if val == :infinity do :infinity else val + (:rand.uniform(100) - 1) / 10000 end end) #同率1位をランダムに選択したい
           |> elem(0)
 
         #デバッグ用標準出力↓
@@ -366,9 +369,10 @@ defmodule FAServer do
           |> Map.delete(:tasknum)
           |> Map.delete(:tasknumlimit)
           |> Map.delete(:creating_task_flag)
+          |> Map.delete(:costmodel)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
-          |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee)} end)
-          |> Enum.map(fn {key, val1, val2, val3} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val3} else {key, elem(val1, 0), length(val2), val3} end end)
+          |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee), Map.get(val, :cluster_fee_magnification), Map.get(val, :cluster_enginenum)} end)
+          |> Enum.map(fn {key, val1, val2, val3, val4, val5} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val2, val3, val3, val4, val5} else {key, elem(val1, 0), length(val2), length(val2)/val5, val3 * val4, val3, val4, val5} end end)
         IO.inspect clustermap
         #デバッグ用標準出力↑
         if state.tasknum == state.tasknumlimit do
@@ -378,6 +382,7 @@ defmodule FAServer do
             |> Map.delete(:tasknum)
             |> Map.delete(:tasknumlimit)
             |> Map.delete(:creating_task_flag)
+            |> Map.delete(:costmodel)
             |> Map.keys()
             |> Enum.map(fn pid -> GenServer.cast(pid, :stop_assigning) end)
         end
@@ -389,40 +394,18 @@ defmodule FAServer do
         end
 
       "clusterfee" ->
-        cluster_responsetime_and_fee_in_cluster = state
+        cluster_fee_and_magnification = state
           |> Map.delete(:relaynetwork_bandwidth)
           |> Map.delete(:relaynetwork_delay)
           |> Map.delete(:tasknum)
           |> Map.delete(:tasknumlimit)
           |> Map.delete(:creating_task_flag)
+          |> Map.delete(:costmodel)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
-          |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_fee)} end)
-          |> Enum.map(fn {key, val1, val2} -> {key, elem(val1, 0), val2} end)
-        delaymap = state.relaynetwork_delay
-          |> Map.get(device_connected_relaypid)
-          |> Enum.map(fn {destination_pid, halfway_delay} ->
-            backway_delay = state.relaynetwork_delay
-            |> Map.get(destination_pid)
-            |> Map.get(device_connected_relaypid)
-              {destination_pid, {halfway_delay, backway_delay}}
-            end)
-          |> Enum.reduce(%{}, fn {destination_pid, delay}, acc -> Map.put_new(acc, destination_pid, delay) end)
-        cluster_responsetime_and_fee = cluster_responsetime_and_fee_in_cluster
-          |> Enum.map(fn {key, restime, fee} ->
-              if restime == :infinity do
-                {key, :infinity, :infinity}
-              else
-                rtr_delays = Map.get(delaymap, key)
-                if restime + elem(rtr_delays, 0) + elem(rtr_delays, 1) >= task.restime_limit do
-                  {key, restime + elem(rtr_delays, 0) + elem(rtr_delays, 1), :infinity}
-                else
-                  {key, restime + elem(rtr_delays, 0) + elem(rtr_delays, 1), fee}
-                end
-              end
-            end)
+          |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_fee), Map.get(val, :cluster_fee_magnification)} end)
 
-        opt_fee_cluster_pid = cluster_responsetime_and_fee
-          |> Enum.min_by(fn {_, _, fee} -> fee end)
+        opt_fee_cluster_pid = cluster_fee_and_magnification
+          |> Enum.min_by(fn {_, fee, magnification} -> if fee == :infinity do :infinity else fee * magnification end end)
           |> elem(0)
 
         #デバッグ用標準出力↓
@@ -432,10 +415,11 @@ defmodule FAServer do
           |> Map.delete(:tasknum)
           |> Map.delete(:tasknumlimit)
           |> Map.delete(:creating_task_flag)
+          |> Map.delete(:costmodel)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
-          |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee)} end)
-          |> Enum.map(fn {key, val1, val2, val3} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val3} else {key, elem(val1, 0), length(val2), val3} end end)
-        #IO.inspect clustermap
+          |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee), Map.get(val, :cluster_fee_magnification), Map.get(val, :cluster_enginenum)} end)
+          |> Enum.map(fn {key, val1, val2, val3, val4, val5} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val2, val3, val3, val4, val5} else {key, elem(val1, 0), length(val2), length(val2)/val5, val3 * val4, val3, val4, val5} end end)
+        IO.inspect clustermap
         #デバッグ用標準出力↑
 
         if state.tasknum == state.tasknumlimit do
@@ -445,12 +429,22 @@ defmodule FAServer do
             |> Map.delete(:tasknum)
             |> Map.delete(:tasknumlimit)
             |> Map.delete(:creating_task_flag)
+            |> Map.delete(:costmodel)
             |> Map.keys()
             |> Enum.map(fn pid -> GenServer.cast(pid, :stop_assigning) end)
         end
         if state.tasknum > state.tasknumlimit do
           {:reply, {"tasknumlimit", "tasknumlimit"}, state}
         else
+          delaymap = state.relaynetwork_delay
+            |> Map.get(device_connected_relaypid)
+            |> Enum.map(fn {destination_pid, halfway_delay} ->
+              backway_delay = state.relaynetwork_delay
+              |> Map.get(destination_pid)
+              |> Map.get(device_connected_relaypid)
+                {destination_pid, {halfway_delay, backway_delay}}
+              end)
+            |> Enum.reduce(%{}, fn {destination_pid, delay}, acc -> Map.put_new(acc, destination_pid, delay) end)
           rtr_delay = Map.get(delaymap, opt_fee_cluster_pid)
           {:reply, {opt_fee_cluster_pid, rtr_delay}, state}
         end
@@ -483,6 +477,7 @@ defmodule FAServer do
       |> Map.delete(:tasknum)
       |> Map.delete(:tasknumlimit)
       |> Map.delete(:creating_task_flag)
+      |> Map.delete(:costmodel)
       |> Enum.map(fn {_, val} -> Map.get(val, :clusterinfo) end)
       |> Enum.map(fn clusterinfo -> Map.get(clusterinfo, :cluster_taskque) end)
       |> Enum.map(fn cluster_taskque -> if cluster_taskque == "no engine" do 0 else length(cluster_taskque) end end)
@@ -514,6 +509,7 @@ defmodule FAServer do
     average_restime = Enum.sum(floatdat) / length(floatdat)
     File.write("responsetime_average.txt",Float.to_string(average_restime) <> "\n",[:append])
 
+    """
     {:ok, strdat} = File.read("clusterfee.txt")
     floatdat = strdat
       |> String.split("\n")
@@ -521,6 +517,7 @@ defmodule FAServer do
       |> Enum.map(fn x -> elem(Float.parse(x),0) end)
     sum_clusterfee = Enum.sum(floatdat)
     File.write("clusterfee_average.txt",Float.to_string(sum_clusterfee) <> "\n",[:append])
+    """
 
     {:ok, strdat} = File.read("clusterfee_processtime.txt")
     floatdat = strdat
@@ -543,6 +540,7 @@ defmodule FAServer do
       |> Map.delete(:tasknum)
       |> Map.delete(:tasknumlimit)
       |> Map.delete(:creating_task_flag)
+      |> Map.delete(:costmodel)
       |> Map.keys()
     Enum.map(relaypids, fn relaypid -> GenServer.call(relaypid, :initialize_clusterinfo_and_taskseed) end)
 
@@ -569,6 +567,7 @@ defmodule FAServer do
     File.write("responsetime_average.txt","")
     File.write("clusterfee_average.txt","")
     File.write("clusterfee_processtime_average.txt","")
+    costmodel = {0, 10.0}
     relayrandomseed = [{0,10,false},{0,10,false},{0,10,false},{5,5,false},{5,5,false},{5,5,false},{10,0,true},{10,0,true},{10,0,true}]
     #relayrandomseed = [{0,10,true},{0,10,true},{0,10,true},{5,5,true},{5,5,true},{5,5,true},{10,0,true},{10,0,true},{10,0,true}]
     #relayrandomseed = [{0,15,false},{5,20,false},{5,5,false},{5,5,false},{10,0,true},{10,0,true},{10,0,true}]
@@ -578,7 +577,7 @@ defmodule FAServer do
     relayrandomseed = Enum.map(relayrandomseed, fn {engine, device, flopsflag, devicerandomseed} -> {engine, device, flopsflag, devicerandomseed, :rand.uniform 1000000} end)
     GenServer.start_link(__MODULE__, %{}, name: AlgoServer)
     Enum.map(relayrandomseed, fn seed ->
-      {:ok, pid} = GRServer.start_link(seed)
+      {:ok, pid} = GRServer.start_link(seed, costmodel)
       relayinfo = GenServer.call(pid, :get_relayinfo)
       GenServer.call(AlgoServer, {:append_relayinfo, pid, relayinfo})
     end)
@@ -586,6 +585,7 @@ defmodule FAServer do
     GenServer.cast(AlgoServer, :initialize_tasknum)
     GenServer.call(AlgoServer, {:append_tasknumlimit, tasknumlimit})
     GenServer.cast(AlgoServer, {:initialize_creating_task_flag, false})
+    GenServer.cast(AlgoServer, {:append_costmodel, costmodel})
     IO.inspect GenServer.call(AlgoServer, :get_relaymap)
     IO.inspect relayrandomseed
   end

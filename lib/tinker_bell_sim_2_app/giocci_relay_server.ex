@@ -32,7 +32,7 @@ defmodule GRServer do
       |> Enum.reduce(0, fn x, acc -> x + acc end)
     predway = 1 #応答時間予測値の計算方法
     history_attenuation = 4.0 #応答時間予測値の計算方法2つ目における履歴情報の減衰率
-    state = Map.update!(state, :clusterinfo, fn _ -> if state.enginemap == %{} do %{cluster_taskque: "no engine", cluster_enginenum: 0, cluster_response_time: {:infinity, [], :infinity, [], predway, history_attenuation}, cluster_fee: :infinity} else %{cluster_taskque: cluster_taskque, cluster_enginenum: Enum.count(state.enginemap), cluster_response_time: {0,[],0,[], predway, history_attenuation}, cluster_fee: (cluster_flops_sum / Enum.count(state.enginemap))} end end)
+    state = Map.update!(state, :clusterinfo, fn _ -> if state.enginemap == %{} do %{cluster_taskque: "no engine", cluster_enginenum: 0, cluster_response_time: {:infinity, [], :infinity, [], predway, history_attenuation}, cluster_fee: :infinity, cluster_fee_magnification: 1.0} else %{cluster_taskque: cluster_taskque, cluster_enginenum: Enum.count(state.enginemap), cluster_response_time: {0,[],0,[], predway, history_attenuation}, cluster_fee: (cluster_flops_sum / Enum.count(state.enginemap)), cluster_fee_magnification: 1.0} end end)
     {:noreply, state}
   end
 
@@ -45,13 +45,25 @@ defmodule GRServer do
     clusterinfo = Map.update!(clusterinfo, :cluster_taskque, fn now_taskque -> if now_taskque == "no engine" do "no engine" else cluster_taskque end end)
     #clusterinfo = Map.update!(clusterinfo, :cluster_response_time, fn now_response_time -> if clusterinfo.cluster_taskque == [] do {0, []} else now_response_time end end)
     #IO.inspect clusterinfo.cluster_taskque
+    cluster_taskque_average = if clusterinfo.cluster_enginenum == "no engine" do
+      0
+    else
+      length(clusterinfo.cluster_taskque) / clusterinfo.cluster_enginenum
+    end
+    cluster_fee_magnification = if cluster_taskque_average <= elem(state.costmodel,0) do
+      1.0
+    else
+      :math.pow(elem(state.costmodel,1), cluster_taskque_average - elem(state.costmodel,0))
+    end
+    clusterinfo = Map.update!(clusterinfo, :cluster_fee_magnification, fn _ -> cluster_fee_magnification end)
+
     state = Map.update!(state, :clusterinfo, fn _ -> clusterinfo end)
     {:reply, state, state}
   end
 
   def handle_cast({:send_task_response_time_in_cluster, processed_task, task_response_time_in_cluster, processing_time_in_engine}, state) do
     File.write("responsetime_in_cluster.txt",Float.to_string(task_response_time_in_cluster) <> "\n",[:append])
-    File.write("clusterfee_processtime.txt",Float.to_string(processing_time_in_engine * state.clusterinfo.cluster_fee / 1000) <> "\n",[:append])
+    File.write("clusterfee_processtime.txt",Float.to_string(processing_time_in_engine * elem(processed_task, 3) / 1000) <> "\n",[:append])
 
     old_clusterinfo = Map.get(state, :clusterinfo)
     new_clusterinfo = old_clusterinfo
@@ -131,7 +143,8 @@ defmodule GRServer do
       {:reply, state, state}
     else
       if self() == assigned_cluster_pid do
-        File.write("clusterfee.txt",Float.to_string(state.clusterinfo.cluster_fee) <> "\n",[:append])
+        #File.write("clusterfee.txt",Float.to_string(state.clusterinfo.cluster_fee) <> "\n",[:append])
+        task = Map.put_new(task, :fee_for_this_task, state.clusterinfo.cluster_fee * state.clusterinfo.cluster_fee_magnification)
         #クラスター内assignはタスクキュー数のみで決定
         engine_taskque_scores = state.enginemap
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :taskque)} end)
@@ -156,7 +169,8 @@ defmodule GRServer do
   end
 
   def handle_cast({:assign_task_in_cluster, task, rtr_delay}, state) do
-    File.write("clusterfee.txt", Float.to_string(state.clusterinfo.cluster_fee) <> "\n",[:append])
+    #File.write("clusterfee.txt", Float.to_string(state.clusterinfo.cluster_fee) <> "\n",[:append])
+    task = Map.put_new(task, :fee_for_this_task, state.clusterinfo.cluster_fee * state.clusterinfo.cluster_fee_magnification)
     #クラスター内assignはタスクキュー数のみで決定
     engine_taskque_scores = state.enginemap
       |> Enum.map(fn {key, val} -> {key, Map.get(val, :taskque)} end)
@@ -203,6 +217,19 @@ defmodule GRServer do
     clusterinfo = Map.update!(clusterinfo, :cluster_taskque, fn now_taskque -> if now_taskque == "no engine" do "no engine" else cluster_taskque end end)
     #clusterinfo = Map.update!(clusterinfo, :cluster_response_time, fn now_response_time -> if clusterinfo.cluster_taskque == [] do {0, []} else now_response_time end end)
     #IO.inspect clusterinfo.cluster_taskque
+
+    cluster_taskque_average = if clusterinfo.cluster_enginenum == "no engine" do
+      0
+    else
+      length(clusterinfo.cluster_taskque) / clusterinfo.cluster_enginenum
+    end
+    cluster_fee_magnification = if cluster_taskque_average <= elem(state.costmodel,0) do
+      1.0
+    else
+      :math.pow(elem(state.costmodel,1), cluster_taskque_average - elem(state.costmodel,0))
+    end
+    clusterinfo = Map.update!(clusterinfo, :cluster_fee_magnification, fn _ -> cluster_fee_magnification end)
+
     state = Map.update!(state, :clusterinfo, fn _ -> clusterinfo end)
 
     GenServer.cast(AlgoServer, {:update_relaymap, self(), state})
@@ -256,8 +283,8 @@ defmodule GRServer do
   end
 
   #client API
-  def start_link(randomseed) do
-    relayinfo = %{enginemap: %{}, devicemap: %{}, clusterinfo: %{}, initialize_info: {0, elem(randomseed, 3)}} #initialize_info: {algonum, taskseed(relay)}
+  def start_link(randomseed, costmodel) do
+    relayinfo = %{enginemap: %{}, devicemap: %{}, clusterinfo: %{}, initialize_info: {0, elem(randomseed, 3)}, costmodel: costmodel} #initialize_info: {algonum, taskseed(relay)}
     {:ok, mypid} = GenServer.start_link(__MODULE__, relayinfo)
     enginenum = elem(randomseed, 0)
     devicenum = elem(randomseed, 1)

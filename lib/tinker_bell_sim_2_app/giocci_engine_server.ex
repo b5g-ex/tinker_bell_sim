@@ -37,7 +37,7 @@ defmodule GEServer do
   def handle_cast({:assign_task_to_engine, task, rtr_delay}, state) do
 
     old_taskque_num = length(state.taskque)
-    state = Map.update!(state, :taskque, fn x -> x ++ [{task.flo, task.task_produced_time, rtr_delay}] end)
+    state = Map.update!(state, :taskque, fn x -> x ++ [{task.flo, task.task_produced_time, rtr_delay, task.fee_for_this_task}] end)
     state = Map.update!(state, :task_assigned_time, fn x -> x ++ [:erlang.monotonic_time()] end)
     #IO.inspect({self(), state.taskque}, label: "assigned engine & taskque") 標準出力
     if old_taskque_num == 0 and state.processing_tasks_flag == False do
