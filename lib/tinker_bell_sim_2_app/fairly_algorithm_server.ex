@@ -174,7 +174,7 @@ defmodule FAServer do
           |> Map.delete(:costmodel)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee), Map.get(val, :cluster_fee_magnification), Map.get(val, :cluster_enginenum)} end)
-          |> Enum.map(fn {key, val1, val2, val3, val4, val5} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val2, val3, val3, val4, val5} else {key, elem(val1, 0), length(val2), length(val2)/val5, val3 * val4, val3, val4, val5} end end)
+          |> Enum.map(fn {key, val1, val2, val3, val4, val5} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val2, val3, val3, val4, val5} else {key, elem(val1, 0), length(val2), length(val2)/val5, round(val3 * val4), val3, val4, val5} end end)
         IO.inspect clustermap
         #デバッグ用標準出力↑
 
@@ -259,7 +259,7 @@ defmodule FAServer do
           |> Map.delete(:costmodel)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee), Map.get(val, :cluster_fee_magnification), Map.get(val, :cluster_enginenum)} end)
-          |> Enum.map(fn {key, val1, val2, val3, val4, val5} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val2, val3, val3, val4, val5} else {key, elem(val1, 0), length(val2), length(val2)/val5, val3 * val4, val3, val4, val5} end end)
+          |> Enum.map(fn {key, val1, val2, val3, val4, val5} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val2, val3, val3, val4, val5} else {key, elem(val1, 0), length(val2), length(val2)/val5, round(val3 * val4), val3, val4, val5} end end)
         IO.inspect clustermap
         #デバッグ用標準出力↑
 
@@ -301,7 +301,7 @@ defmodule FAServer do
           |> Map.delete(:costmodel)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee), Map.get(val, :cluster_fee_magnification), Map.get(val, :cluster_enginenum)} end)
-          |> Enum.map(fn {key, val1, val2, val3, val4, val5} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val2, val3, val3, val4, val5} else {key, elem(val1, 0), length(val2), length(val2)/val5, val3 * val4, val3, val4, val5} end end)
+          |> Enum.map(fn {key, val1, val2, val3, val4, val5} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val2, val3, val3, val4, val5} else {key, elem(val1, 0), length(val2), length(val2)/val5, round(val3 * val4), val3, val4, val5} end end)
         #IO.inspect clustermap
         #デバッグ用標準出力↑
 
@@ -372,7 +372,7 @@ defmodule FAServer do
           |> Map.delete(:costmodel)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee), Map.get(val, :cluster_fee_magnification), Map.get(val, :cluster_enginenum)} end)
-          |> Enum.map(fn {key, val1, val2, val3, val4, val5} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val2, val3, val3, val4, val5} else {key, elem(val1, 0), length(val2), length(val2)/val5, val3 * val4, val3, val4, val5} end end)
+          |> Enum.map(fn {key, val1, val2, val3, val4, val5} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val2, val3, val3, val4, val5} else {key, elem(val1, 0), length(val2), length(val2)/val5, round(val3 * val4), val3, val4, val5} end end)
         IO.inspect clustermap
         #デバッグ用標準出力↑
         if state.tasknum == state.tasknumlimit do
@@ -418,7 +418,7 @@ defmodule FAServer do
           |> Map.delete(:costmodel)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time), Map.get(val, :cluster_taskque), Map.get(val, :cluster_fee), Map.get(val, :cluster_fee_magnification), Map.get(val, :cluster_enginenum)} end)
-          |> Enum.map(fn {key, val1, val2, val3, val4, val5} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val2, val3, val3, val4, val5} else {key, elem(val1, 0), length(val2), length(val2)/val5, val3 * val4, val3, val4, val5} end end)
+          |> Enum.map(fn {key, val1, val2, val3, val4, val5} -> if val2 == "no engine" do {key, elem(val1, 0), val2, val2, val3, val3, val4, val5} else {key, elem(val1, 0), length(val2), length(val2)/val5, round(val3 * val4), val3, val4, val5} end end)
         IO.inspect clustermap
         #デバッグ用標準出力↑
 
@@ -527,10 +527,19 @@ defmodule FAServer do
     sum_clusterfee = Enum.sum(floatdat)
     File.write("clusterfee_processtime_average.txt",Float.to_string(sum_clusterfee) <> "\n",[:append])
 
+    {:ok, strdat} = File.read("RtRDelay.txt")
+    floatdat = strdat
+      |> String.split("\n")
+      |> List.delete("")
+      |> Enum.map(fn x -> elem(Integer.parse(x),0) end)
+    average_rtrdelay = Enum.sum(floatdat) / length(floatdat)
+    File.write("RtRDelay_average.txt",Float.to_string(average_rtrdelay) <> "\n",[:append])
+
     File.write("responsetime_in_cluster.txt","")
     File.write("responsetime.txt","")
-    File.write("clusterfee.txt","")
+    #File.write("clusterfee.txt","")
     File.write("clusterfee_processtime.txt","")
+    File.write("RtRDelay.txt","")
 
     #パラメータを初期化して次の実験へ
     GenServer.cast(AlgoServer, :initialize_tasknum)
@@ -561,12 +570,14 @@ defmodule FAServer do
   def start_link(taskseed, engineseed, tasknumlimit) do
     File.write("responsetime_in_cluster.txt","")
     File.write("responsetime.txt","")
-    File.write("clusterfee.txt","")
+    #File.write("clusterfee.txt","")
     File.write("clusterfee_processtime.txt","")
+    File.write("RtRDelay.txt","")
     File.write("responsetime_in_cluster_average.txt","")
     File.write("responsetime_average.txt","")
-    File.write("clusterfee_average.txt","")
+    #File.write("clusterfee_average.txt","")
     File.write("clusterfee_processtime_average.txt","")
+    File.write("RtRDelay_average.txt","")
     costmodel = {0, 10.0}
     relayrandomseed = [{0,10,false},{0,10,false},{0,10,false},{5,5,false},{5,5,false},{5,5,false},{10,0,true},{10,0,true},{10,0,true}]
     #relayrandomseed = [{0,10,true},{0,10,true},{0,10,true},{5,5,true},{5,5,true},{5,5,true},{10,0,true},{10,0,true},{10,0,true}]
