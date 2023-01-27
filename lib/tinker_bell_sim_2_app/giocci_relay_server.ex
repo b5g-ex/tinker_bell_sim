@@ -31,7 +31,7 @@ defmodule GRServer do
       |> Enum.map(fn x -> Map.get(x, :hidden_parameter_flops) end)
       |> Enum.reduce(0, fn x, acc -> x + acc end)
     predway = 1 #応答時間予測値の計算方法
-    history_attenuation = 4.0 #応答時間予測値の計算方法2つ目における履歴情報の減衰率
+    history_attenuation = 0.25 #応答時間予測値の計算方法2つ目における履歴情報の減衰率
     state = Map.update!(state, :clusterinfo, fn _ -> if state.enginemap == %{} do %{cluster_taskque: "no engine", cluster_enginenum: 0, cluster_response_time: {:infinity, [], :infinity, [], predway, history_attenuation}, cluster_fee: :infinity, cluster_fee_magnification: 1.0} else %{cluster_taskque: cluster_taskque, cluster_enginenum: Enum.count(state.enginemap), cluster_response_time: {0,[],0,[], predway, history_attenuation}, cluster_fee: (cluster_flops_sum / Enum.count(state.enginemap)), cluster_fee_magnification: 1.0} end end)
     {:noreply, state}
   end
@@ -63,7 +63,7 @@ defmodule GRServer do
 
   def handle_cast({:send_task_response_time_in_cluster, processed_task, task_response_time_in_cluster, processing_time_in_engine}, state) do
     File.write("responsetime_in_cluster.txt",Float.to_string(task_response_time_in_cluster) <> "\n",[:append])
-    File.write("clusterfee_processtime.txt",Float.to_string(processing_time_in_engine * elem(processed_task, 3) / 1000) <> "\n",[:append])
+    File.write("clusterfee_processtime.txt", Float.to_string(elem(processed_task, 0) * elem(processed_task, 3) / 1000) <> "\n",[:append])
 
     old_clusterinfo = Map.get(state, :clusterinfo)
     new_clusterinfo = old_clusterinfo
@@ -90,7 +90,7 @@ defmodule GRServer do
 
               {new_response_time, newdata, new_response_time_history, newhistory, predway, history_attenuation}
             1 ->
-              {task_response_time_in_cluster + now_response_time / history_attenuation, nowdata, now_response_time_history, nowhistory, predway, history_attenuation}
+              {task_response_time_in_cluster + now_response_time * history_attenuation, nowdata, now_response_time_history, nowhistory, predway, history_attenuation}
           end
         end)
     state = Map.update!(state, :clusterinfo, fn _ -> new_clusterinfo end)
