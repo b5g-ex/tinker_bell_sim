@@ -139,6 +139,9 @@ defmodule GRServer do
   def handle_call({:assign_request, devicepid, task}, _from, state) do
 
     {assigned_cluster_pid, rtr_delay} = GenServer.call(AlgoServer, {:assign_algorithm, devicepid, self(), task})
+    if rtr_delay != "tasknumlimit" do
+      File.write("RtRDelay.txt",Integer.to_string(elem(rtr_delay, 0) + elem(rtr_delay, 1)) <> "\n",[:append])
+    end
     if assigned_cluster_pid == "tasknumlimit" do
       {:reply, state, state}
     else
@@ -150,7 +153,7 @@ defmodule GRServer do
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :taskque)} end)
           |> Enum.map(fn {key, val} -> {key, length(val)} end)
         assigned_engine_pid = engine_taskque_scores
-          |> Enum.min_by(fn {key, val} -> val + (:rand.uniform(100) - 1) / 100 end)
+          |> Enum.min_by(fn {_, val} -> val + (:rand.uniform(100) - 1) / 100 end)
           |> elem(0)
 
         #relayserver内のengine_taskqueを更新

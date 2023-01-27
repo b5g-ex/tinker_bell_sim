@@ -529,10 +529,19 @@ defmodule FAServer do
     sum_clusterfee = Enum.sum(floatdat)
     File.write("clusterfee_processtime_average.txt",Float.to_string(sum_clusterfee) <> "\n",[:append])
 
+    {:ok, strdat} = File.read("RtRDelay.txt")
+    floatdat = strdat
+      |> String.split("\n")
+      |> List.delete("")
+      |> Enum.map(fn x -> elem(Integer.parse(x),0) end)
+    average_rtrdelay = Enum.sum(floatdat) / length(floatdat)
+    File.write("RtRDelay_average.txt",Float.to_string(average_rtrdelay) <> "\n",[:append])
+
     File.write("responsetime_in_cluster.txt","")
     File.write("responsetime.txt","")
-    File.write("clusterfee.txt","")
+    #File.write("clusterfee.txt","")
     File.write("clusterfee_processtime.txt","")
+    File.write("RtRDelay.txt","")
 
     #パラメータを初期化して次の実験へ
     GenServer.cast(AlgoServer, :initialize_tasknum)
@@ -563,11 +572,12 @@ defmodule FAServer do
   def start_link(taskseed, engineseed, tasknumlimit) do
     File.write("responsetime_in_cluster.txt","")
     File.write("responsetime.txt","")
-    File.write("clusterfee.txt","")
+    #File.write("clusterfee.txt","")
     File.write("clusterfee_processtime.txt","")
+    File.write("RtRDelay.txt","")
     File.write("responsetime_in_cluster_average.txt","")
     File.write("responsetime_average.txt","")
-    File.write("clusterfee_average.txt","")
+    #File.write("clusterfee_average.txt","")
     File.write("clusterfee_processtime_average.txt","")
     costmodel = {1.0, 10.0}
     relayrandomseed = [{0,10,false},{0,10,false},{0,10,false},{5,5,false},{5,5,false},{5,5,false},{10,0,true},{10,0,true},{10,0,true}]
