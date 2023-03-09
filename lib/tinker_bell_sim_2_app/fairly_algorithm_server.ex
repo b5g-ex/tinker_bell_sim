@@ -129,7 +129,6 @@ defmodule FAServer do
             |> Enum.min_by(fn {_, val} -> val end)
             |> elem(1)
           if min_cluster_responsetime_in_cluster == 0 do
-            IO.inspect "taskque"
             "taskque"
           else
             "responsetime"
@@ -495,7 +494,7 @@ defmodule FAServer do
   end
 
   def handle_cast(:initialize_parameters, state) do
-    {:ok, strdat} = File.read("responsetime_in_cluster.txt")
+    {:ok, strdat} = File.read("responsetime_in_cluster_mem.txt")
     floatdat = strdat
       |> String.split("\n")
       |> List.delete("")
@@ -503,7 +502,7 @@ defmodule FAServer do
     average_restime = Enum.sum(floatdat) / length(floatdat)
     File.write("responsetime_in_cluster_average.txt",Float.to_string(average_restime) <> "\n",[:append])
 
-    {:ok, strdat} = File.read("responsetime.txt")
+    {:ok, strdat} = File.read("responsetime_mem.txt")
     floatdat = strdat
       |> String.split("\n")
       |> List.delete("")
@@ -521,7 +520,7 @@ defmodule FAServer do
     File.write("clusterfee_average.txt",Float.to_string(sum_clusterfee) <> "\n",[:append])
     """
 
-    {:ok, strdat} = File.read("clusterfee_processtime.txt")
+    {:ok, strdat} = File.read("clusterfee_processtime_mem.txt")
     floatdat = strdat
       |> String.split("\n")
       |> List.delete("")
@@ -529,7 +528,7 @@ defmodule FAServer do
     sum_clusterfee = Enum.sum(floatdat)
     File.write("clusterfee_processtime_sum.txt",Float.to_string(sum_clusterfee) <> "\n",[:append])
 
-    {:ok, strdat} = File.read("RtRDelay.txt")
+    {:ok, strdat} = File.read("RtRDelay_mem.txt")
     floatdat = strdat
       |> String.split("\n")
       |> List.delete("")
@@ -537,11 +536,14 @@ defmodule FAServer do
     average_rtrdelay = Enum.sum(floatdat) / length(floatdat)
     File.write("RtRDelay_average.txt",Float.to_string(average_rtrdelay) <> "\n",[:append])
 
-    File.write("responsetime_in_cluster.txt","")
-    File.write("responsetime.txt","")
-    #File.write("clusterfee.txt","")
-    File.write("clusterfee_processtime.txt","")
-    File.write("RtRDelay.txt","")
+    File.write("responsetime_in_cluster_mem.txt","")
+    File.write("responsetime_mem.txt","")
+    File.write("clusterfee_processtime_mem.txt","")
+    File.write("RtRDelay_mem.txt","")
+    File.write("responsetime_in_cluster.txt","\n\n\n\n\n",[:append])
+    File.write("responsetime.txt","\n\n\n\n\n",[:append])
+    File.write("clusterfee_processtime.txt","\n\n\n\n\n",[:append])
+    File.write("RtRDelay.txt","\n\n\n\n\n",[:append])
 
     #パラメータを初期化して次の実験へ
     GenServer.cast(AlgoServer, :initialize_tasknum)
@@ -572,18 +574,23 @@ defmodule FAServer do
   def start_link(taskseed, engineseed, tasknumlimit) do
     File.write("responsetime_in_cluster.txt","")
     File.write("responsetime.txt","")
-    #File.write("clusterfee.txt","")
     File.write("clusterfee_processtime.txt","")
     File.write("RtRDelay.txt","")
+
+    File.write("responsetime_in_cluster_mem.txt","")
+    File.write("responsetime_mem.txt","")
+    File.write("clusterfee_processtime_mem.txt","")
+    File.write("RtRDelay_mem.txt","")
+
     File.write("responsetime_in_cluster_average.txt","")
     File.write("responsetime_average.txt","")
-    #File.write("clusterfee_average.txt","")
     File.write("clusterfee_processtime_sum.txt","")
     File.write("RtRDelay_average.txt","")
+
     costmodel = {1.0, 10.0}
-    relayrandomseed = [{0,10,false},{0,10,false},{0,10,false},{5,5,false},{5,5,false},{5,5,false},{10,0,true},{10,0,true},{10,0,true}]
+    #relayrandomseed = [{0,10,false},{0,10,false},{0,10,false},{5,5,false},{5,5,false},{5,5,false},{10,0,true},{10,0,true},{10,0,true}]
     #relayrandomseed = [{0,10,true},{0,10,true},{0,10,true},{5,5,true},{5,5,true},{5,5,true},{10,0,true},{10,0,true},{10,0,true}]
-    #relayrandomseed = [{0,15,false},{5,20,false},{5,5,false},{5,5,false},{10,0,true},{10,0,true},{10,0,true}]
+    relayrandomseed = [{0,15,false},{5,15,false},{5,10,false},{5,5,false},{10,0,true},{10,0,true},{10,0,true}]
     _ = :rand.seed(:exsss, taskseed)
     relayrandomseed = Enum.map(relayrandomseed, fn {engine, device, flopsflag} -> {engine, device, flopsflag, :rand.uniform 1000000} end)
     _ = :rand.seed(:exsss, engineseed)

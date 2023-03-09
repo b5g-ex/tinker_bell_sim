@@ -64,6 +64,8 @@ defmodule GRServer do
   def handle_cast({:send_task_response_time_in_cluster, processed_task, task_response_time_in_cluster, processing_time_in_engine}, state) do
     File.write("responsetime_in_cluster.txt",Float.to_string(task_response_time_in_cluster) <> "\n",[:append])
     File.write("clusterfee_processtime.txt", Float.to_string(elem(processed_task, 0) * elem(processed_task, 3) / 1000) <> "\n",[:append])
+    File.write("responsetime_in_cluster_mem.txt",Float.to_string(task_response_time_in_cluster) <> "\n",[:append])
+    File.write("clusterfee_processtime_mem.txt", Float.to_string(elem(processed_task, 0) * elem(processed_task, 3) / 1000) <> "\n",[:append])
 
     old_clusterinfo = Map.get(state, :clusterinfo)
     new_clusterinfo = old_clusterinfo
@@ -106,6 +108,7 @@ defmodule GRServer do
     task_processed_time = :erlang.monotonic_time()
     task_responsetime = (task_processed_time - elem(processed_task, 1)) / :math.pow(10,6)
     File.write("responsetime.txt",Float.to_string(task_responsetime) <> "\n",[:append])
+    File.write("responsetime_mem.txt",Float.to_string(task_responsetime) <> "\n",[:append])
     {:noreply, state}
   end
 
@@ -141,6 +144,7 @@ defmodule GRServer do
     {assigned_cluster_pid, rtr_delay} = GenServer.call(AlgoServer, {:assign_algorithm, devicepid, self(), task})
     if rtr_delay != "tasknumlimit" do
       File.write("RtRDelay.txt",Integer.to_string(elem(rtr_delay, 0) + elem(rtr_delay, 1)) <> "\n",[:append])
+      File.write("RtRDelay_mem.txt",Integer.to_string(elem(rtr_delay, 0) + elem(rtr_delay, 1)) <> "\n",[:append])
     end
     if assigned_cluster_pid == "tasknumlimit" do
       {:reply, state, state}
