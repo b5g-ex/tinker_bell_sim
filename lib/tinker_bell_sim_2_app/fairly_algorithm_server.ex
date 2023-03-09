@@ -357,7 +357,8 @@ defmodule FAServer do
                 {key, restime_eval}
               else
                 rtr_delays = Map.get(delaymap, key)
-                {key, restime_eval * (1 - history_attenuation) + elem(rtr_delays, 0) + elem(rtr_delays, 1)}
+                #{key, restime_eval * (1 - history_attenuation) + elem(rtr_delays, 0) + elem(rtr_delays, 1)} #predway==1
+                {key, restime_eval + elem(rtr_delays, 0) + elem(rtr_delays, 1)} #predway==2
               end
             end)
           |> Enum.min_by(fn {_, val} -> if val == :infinity do :infinity else val + (:rand.uniform(100) - 1) / 10000 end end) #同率1位をランダムに選択したい
