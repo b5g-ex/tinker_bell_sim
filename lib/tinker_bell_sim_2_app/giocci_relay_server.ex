@@ -61,11 +61,11 @@ defmodule GRServer do
     {:reply, state, state}
   end
 
-  def handle_cast({:send_task_response_time_in_cluster, processed_task, task_response_time_in_cluster, processing_time_in_engine}, state) do
+  def handle_cast({:send_task_response_time_in_cluster, processed_task, task_response_time_in_cluster}, state) do
     File.write("responsetime_in_cluster.txt",Float.to_string(task_response_time_in_cluster) <> "\n",[:append])
-    File.write("clusterfee_processtime.txt", Float.to_string(elem(processed_task, 0) * elem(processed_task, 3) / 1000) <> "\n",[:append])
+    File.write("clusterfee.txt", Float.to_string(elem(processed_task, 0) * elem(processed_task, 3) / 1000) <> "\n",[:append])
     File.write("responsetime_in_cluster_mem.txt",Float.to_string(task_response_time_in_cluster) <> "\n",[:append])
-    File.write("clusterfee_processtime_mem.txt", Float.to_string(elem(processed_task, 0) * elem(processed_task, 3) / 1000) <> "\n",[:append])
+    File.write("clusterfee_mem.txt", Float.to_string(elem(processed_task, 0) * elem(processed_task, 3) / 1000) <> "\n",[:append])
 
     old_clusterinfo = Map.get(state, :clusterinfo)
     new_clusterinfo = old_clusterinfo
@@ -141,9 +141,9 @@ defmodule GRServer do
     {:noreply, state}
   end
 
-  def handle_call({:assign_request, devicepid, task}, _from, state) do
+  def handle_call({:assign_request, task}, _from, state) do
 
-    {assigned_cluster_pid, rtr_delay} = GenServer.call(AlgoServer, {:assign_algorithm, devicepid, self(), task})
+    {assigned_cluster_pid, rtr_delay} = GenServer.call(AlgoServer, {:assign_algorithm, self(), task})
     if rtr_delay != "tasknumlimit" do
       File.write("RtRDelay.txt",Integer.to_string(elem(rtr_delay, 0) + elem(rtr_delay, 1)) <> "\n",[:append])
       File.write("RtRDelay_mem.txt",Integer.to_string(elem(rtr_delay, 0) + elem(rtr_delay, 1)) <> "\n",[:append])
@@ -185,7 +185,7 @@ defmodule GRServer do
       |> Enum.map(fn {key, val} -> {key, Map.get(val, :taskque)} end)
       |> Enum.map(fn {key, val} -> {key, length(val)} end)
     assigned_engine_pid = engine_taskque_scores
-      |> Enum.min_by(fn {key, val} -> val + (:rand.uniform(100) - 1) / 100 end)
+      |> Enum.min_by(fn {_, val} -> val + (:rand.uniform(100) - 1) / 100 end)
       |> elem(0)
 
     #relayserver内のengine_taskqueを更新
@@ -214,8 +214,8 @@ defmodule GRServer do
   def handle_cast({:update_enginemap, enginepid, new_engineinfo}, state) do
 
     now_enginemap = state.enginemap
-    new_enginemap = Map.update!(now_enginemap, enginepid, fn engineinfo -> new_engineinfo end)
-    state = Map.update!(state, :enginemap, fn x -> new_enginemap end)
+    new_enginemap = Map.update!(now_enginemap, enginepid, fn _ -> new_engineinfo end)
+    state = Map.update!(state, :enginemap, fn _ -> new_enginemap end)
 
     #update_clusterinfoをする
     cluster_taskque = state.enginemap
@@ -315,7 +315,7 @@ defmodule GRServer do
       end)
     end
     if devicenum > 0 do
-      {algonum, taskseed} = relayinfo.initialize_info
+      {algonum, _} = relayinfo.initialize_info
       Enum.map(devicerandomseed, fn seed ->
         {:ok, pid} = EndDevice.start_link(%{taskflag: false, relaypid: mypid, randomseed: seed, algo: "taskque"})
         GenServer.call(mypid, {:append_deviceinfo, pid, %{taskflag: false, relaypid: mypid, creating_task: False}})

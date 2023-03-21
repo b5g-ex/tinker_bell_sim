@@ -54,7 +54,7 @@ defmodule EndDevice do
     #File.write("outputflo2.txt",Integer.to_string(florand) <> "\n",[:append])
     task = %{flo: 2500 + florand, task_produced_time: :erlang.monotonic_time(), algo: state.algo, restime_limit: 10000} #restime_limitはCluster利用コスト最適化における応答時間の閾値
     #IO.inspect(self(), label: "task request from Device") 標準出力
-    GenServer.call(state.relaypid, {:assign_request, self(), task})
+    GenServer.call(state.relaypid, {:assign_request, task})
 
     state = Map.update!(state, :randomseed, fn _ -> timerrand + florand end)
 
