@@ -82,8 +82,6 @@ defmodule FAServer do
   def handle_call({:assign_algorithm, device_connected_relaypid, task}, _from, state) do
 
     state = Map.update!(state, :tasknum, fn prev -> prev + 1 end)
-    #IO.inspect state.tasknum
-    #IO.inspect state.creating_task_flag
 
     #algo3,4をresponsetime履歴が集まるまでtaskqueにする
     task = Map.update!(task, :algo, fn algorithm -> case algorithm do
@@ -219,8 +217,6 @@ defmodule FAServer do
           end
         end)
         cluster_delaymap = Map.drop(delaymap, noengine_relaypids)
-        #IO.inspect noengine_relaypids
-        #IO.inspect cluster_delaymap
 
         min_delay_cluster_pid = cluster_delaymap
           |> Enum.min_by(fn {_, {val1, val2}} -> val1 + val2 end)
@@ -546,7 +542,6 @@ defmodule FAServer do
 
   def handle_cast({:update_relaymap, relaypid, new_relayinfo}, state) do
     state = Map.update!(state, relaypid, fn _ -> new_relayinfo end)
-    #IO.inspect "engineinfo updated"
     {:noreply, state}
   end
 
@@ -568,9 +563,7 @@ defmodule FAServer do
     File.write("RtRDelay_average.txt","")
 
     costmodel = {1.0, 10.0}
-    #relayrandomseed = [{0,10,false},{0,10,false},{0,10,false},{5,5,false},{5,5,false},{5,5,false},{10,0,true},{10,0,true},{10,0,true}]
-    #relayrandomseed = [{0,10,true},{0,10,true},{0,10,true},{5,5,true},{5,5,true},{5,5,true},{10,0,true},{10,0,true},{10,0,true}]
-    relayrandomseed = [{0,15,false},{5,15,false},{5,10,false},{5,5,false},{10,0,true},{10,0,true},{10,0,true}]
+    relayrandomseed = [{0,10,false},{0,10,false},{0,10,false},{5,5,false},{5,5,false},{5,5,false},{10,0,true},{10,0,true},{10,0,true}]
     _ = :rand.seed(:exsss, taskseed)
     relayrandomseed = Enum.map(relayrandomseed, fn {engine, device, flopsflag} -> {engine, device, flopsflag, :rand.uniform 1000000} end)
     _ = :rand.seed(:exsss, engineseed)
@@ -598,7 +591,7 @@ defmodule FAServer do
     {:ok}
   end
 
-  #これやってもすぐタスク生成が止まらない　なぜ
+  #これやってもすぐタスク生成が止まらない（Device内のtaskflagをfalseにしてもその時の:create_taskはとまらないため）
   def stop_assigning() do
     GenServer.call(AlgoServer, :get_relaymap)
     |> Map.keys()

@@ -72,6 +72,7 @@ defmodule GRServer do
       |> Map.update!(:cluster_response_time, fn {now_response_time, nowdata, now_response_time_history, nowhistory, predway, history_attenuation} ->
           case predway do
             0 ->
+              #直近の実測値の平均
               newdata = if length(nowdata) < 3 do
                 nowdata ++ [task_response_time_in_cluster]
               else
@@ -92,8 +93,10 @@ defmodule GRServer do
 
               {new_response_time, newdata, new_response_time_history, newhistory, predway, history_attenuation}
             1 ->
+              #更新法（RIXX以前）
               {task_response_time_in_cluster + now_response_time * history_attenuation, nowdata, now_response_time_history, nowhistory, predway, history_attenuation}
             2 ->
+              #更新法（RIXX以降）
               {task_response_time_in_cluster * (1 - history_attenuation) + now_response_time * history_attenuation, nowdata, now_response_time_history, nowhistory, predway, history_attenuation}
           end
         end)

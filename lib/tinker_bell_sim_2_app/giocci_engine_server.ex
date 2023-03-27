@@ -8,7 +8,6 @@ defmodule GEServer do
   end
 
   def handle_call(:get_engineinfo, _from, state) do
-    #engineinfo = Map.merge(state, %{taskque: GenServer.call(state.taskque_pid, :get_taskque)})
     {:reply, state, state}
   end
 
@@ -16,9 +15,7 @@ defmodule GEServer do
 
     _ = :rand.seed(:exsss, state.randomseed)
     flops = if state.flopsflag do 5000 + :rand.uniform 10000 else 500 + :rand.uniform 1000 end
-    #File.write("flops2.txt",Integer.to_string(flops) <> "\n",[:append])
-
-    #engine to relay 通信特性はrelay to relay通信路に比べて十分強い通信路を想定し、考慮しなくて良いものとする
+    #engine flops
 
     state = Map.merge(state, %{taskque: [], task_assigned_time: [], hidden_parameter_flops: flops, processing_tasks_flag: False})
 

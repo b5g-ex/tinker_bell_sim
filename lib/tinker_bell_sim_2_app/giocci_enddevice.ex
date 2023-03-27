@@ -47,13 +47,12 @@ defmodule EndDevice do
   def handle_cast(:create_task, state) do
     _ = :rand.seed(:exsss, state.randomseed)
     timerrand = :rand.uniform 10000
-    #File.write("outputtimer2.txt",Integer.to_string(timerrand) <> "\n",[:append])
-    :timer.sleep(5000 + timerrand) #5秒平均
+    :timer.sleep(5000 + timerrand) #タスク生成間隔時間
     #create task ↓
     florand = :rand.uniform 5000
-    #File.write("outputflo2.txt",Integer.to_string(florand) <> "\n",[:append])
-    task = %{flo: 2500 + florand, task_produced_time: :erlang.monotonic_time(), algo: state.algo, restime_limit: 10000} #restime_limitはCluster利用コスト最適化における応答時間の閾値
-    #IO.inspect(self(), label: "task request from Device") 標準出力
+    task = %{flo: 2500 + florand, task_produced_time: :erlang.monotonic_time(), algo: state.algo, restime_limit: 10000}
+    #flo: タスクの重さ
+    #restime_limitはCluster利用コスト最適化における応答時間の閾値
     GenServer.call(state.relaypid, {:assign_request, task})
 
     state = Map.update!(state, :randomseed, fn _ -> timerrand + florand end)
