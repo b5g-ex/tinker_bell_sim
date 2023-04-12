@@ -644,7 +644,7 @@ defmodule FAServer do
   end
 
   # Client API
-  def start_link(taskseed, engineseed, tasknumlimit) do
+  def start_link([taskseed, engineseed, tasknumlimit]) do
     File.write("responsetime_in_cluster.txt", "")
     File.write("responsetime.txt", "")
     File.write("clusterfee.txt", "")
