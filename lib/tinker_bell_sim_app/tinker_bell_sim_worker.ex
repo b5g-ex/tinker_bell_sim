@@ -1,7 +1,7 @@
 defmodule TinkerBellSimWorker do
   use GenServer
 
-  #GenServer API
+  # GenServer API
   def init(workerstate) do
     {:ok, workerstate}
   end
@@ -21,34 +21,35 @@ defmodule TinkerBellSimWorker do
   end
 
   def handle_call(:newtask, _from, workerstate) do
-    newtask = {(:rand.uniform 1000), self()}
-    workerstate = Map.update(workerstate, :tasks, [], fn nowtasks ->
-       nowtasks ++ [newtask]
-    end)
-    #IO.inspect workerstate
+    newtask = {:rand.uniform(1000), self()}
+
+    workerstate =
+      Map.update(workerstate, :tasks, [], fn nowtasks ->
+        nowtasks ++ [newtask]
+      end)
+
+    # IO.inspect workerstate
     {:reply, newtask, workerstate}
   end
 
-  def handle_cast({:do_tasks,assignmap}, workerstate) do
-
+  def handle_cast({:do_tasks, assignmap}, workerstate) do
     t1 = :erlang.monotonic_time()
 
-    tasks = Map.get(assignmap,self())
-    Enum.each(tasks, fn x -> :timer.sleep(elem(x,0)) end)
+    tasks = Map.get(assignmap, self())
+    Enum.each(tasks, fn x -> :timer.sleep(elem(x, 0)) end)
 
     t2 = :erlang.monotonic_time()
 
     time = :erlang.convert_time_unit(t2 - t1, :native, :microsecond)
-    IO.inspect [self(),time]
+    IO.inspect([self(), time])
 
     workerstate = Map.update(workerstate, :tasks, [], fn nowtasks -> [] end)
 
     {:noreply, workerstate}
   end
 
-  #Client API
+  # Client API
   def start_link(workerstate \\ %{}) do
     GenServer.start_link(__MODULE__, workerstate)
   end
-
 end

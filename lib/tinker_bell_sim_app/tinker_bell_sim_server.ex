@@ -1,7 +1,7 @@
 defmodule TinkerBellSimServer do
   use GenServer
 
-  #GenServer API
+  # GenServer API
   def init(state) do
     {:ok, state}
   end
@@ -9,9 +9,12 @@ defmodule TinkerBellSimServer do
   def handle_call({:update_worker_state, id}, _from, state) do
     pid = Enum.at(Map.keys(state), id)
     workerstate = GenServer.call(pid, :get_workerstate)
-    IO.inspect workerstate
-    state = Map.update(state, pid, 0, fn _ -> Map.get(workerstate,:calcpower) end)
-    state = Map.update(state, :tasks, 0, fn nowtasks -> nowtasks ++ Map.get(workerstate,:tasks) end)
+    IO.inspect(workerstate)
+    state = Map.update(state, pid, 0, fn _ -> Map.get(workerstate, :calcpower) end)
+
+    state =
+      Map.update(state, :tasks, 0, fn nowtasks -> nowtasks ++ Map.get(workerstate, :tasks) end)
+
     {:reply, state, state}
   end
 
@@ -32,221 +35,252 @@ defmodule TinkerBellSimServer do
 
   def handle_call(:let_workers_create_newtask, _from, state) do
     _ = :rand.seed(:exsss, 9000)
+
     for times <- 2..6 do
-      GenServer.call(Enum.at(Map.keys(state),times),{:set_randomseed, times})
-      for tasknum <- 0..:rand.uniform 4 do
-        GenServer.call(Enum.at(Map.keys(state),times),:newtask)
+      GenServer.call(Enum.at(Map.keys(state), times), {:set_randomseed, times})
+
+      for tasknum <- 0..:rand.uniform(4) do
+        GenServer.call(Enum.at(Map.keys(state), times), :newtask)
       end
-      GenServer.call(Enum.at(Map.keys(state),times),:get_workerstate)
+
+      GenServer.call(Enum.at(Map.keys(state), times), :get_workerstate)
     end
+
     {:reply, state, state}
   end
 
   def handle_call(:get_tasklist_length, _from, state) do
-    tasklist_length = state
+    tasklist_length =
+      state
       |> Map.fetch(:tasks)
       |> elem(1)
       |> length()
+
     {:reply, tasklist_length, state}
   end
 
   def handle_call(:assign_tasks_maxgreedy, _from, state) do
-
-    tasklist = state
+    tasklist =
+      state
       |> Map.fetch(:tasks)
       |> elem(1)
-    {assignedtask,tasklist} = List.pop_at(tasklist,0)
-    #IO.inspect {assignedtask,tasklist}
 
-    assignmap = state
+    {assignedtask, tasklist} = List.pop_at(tasklist, 0)
+    # IO.inspect {assignedtask,tasklist}
+
+    assignmap =
+      state
       |> Map.fetch(:assignmap)
       |> elem(1)
-    max_calcpower = state
+
+    max_calcpower =
+      state
       |> Map.values()
       |> tl()
       |> tl()
       |> Enum.max()
-    #IO.inspect max_calcpower
-    pid = state
-      |>Enum.find(fn {key, val} -> val == max_calcpower end)
-      |>elem(0)
-    #IO.inspect pid
+
+    # IO.inspect max_calcpower
+    pid =
+      state
+      |> Enum.find(fn {key, val} -> val == max_calcpower end)
+      |> elem(0)
+
+    # IO.inspect pid
 
     assignmap = Map.update(assignmap, pid, [], fn nowtasks -> nowtasks ++ [assignedtask] end)
     state = %{state | tasks: tasklist}
     state = %{state | assignmap: assignmap}
-    state = Map.update(state, pid, [], fn x -> x - elem(assignedtask,0) end)
+    state = Map.update(state, pid, [], fn x -> x - elem(assignedtask, 0) end)
 
     {:reply, state, state}
   end
 
   def handle_call(:assign_tasks_mingreedy, _from, state) do
-
-    tasklist = state
+    tasklist =
+      state
       |> Map.fetch(:tasks)
       |> elem(1)
-    {assignedtask,tasklist} = List.pop_at(tasklist,0)
-    #IO.inspect {assignedtask,tasklist}
 
-    assignmap = state
+    {assignedtask, tasklist} = List.pop_at(tasklist, 0)
+    # IO.inspect {assignedtask,tasklist}
+
+    assignmap =
+      state
       |> Map.fetch(:assignmap)
       |> elem(1)
-    min_calcpower = state
+
+    min_calcpower =
+      state
       |> Map.values()
       |> tl()
       |> tl()
-      |> Enum.filter(fn x -> x >= elem(assignedtask,0) end)
+      |> Enum.filter(fn x -> x >= elem(assignedtask, 0) end)
       |> Enum.min()
 
-    pid = state
+    pid =
+      state
       |> Enum.find(fn {key, val} -> val == min_calcpower end)
       |> elem(0)
-    #IO.inspect pid
+
+    # IO.inspect pid
 
     assignmap = Map.update(assignmap, pid, [], fn nowtasks -> nowtasks ++ [assignedtask] end)
     state = %{state | tasks: tasklist}
     state = %{state | assignmap: assignmap}
-    state = Map.update(state, pid, [], fn x -> x - elem(assignedtask,0) end)
+    state = Map.update(state, pid, [], fn x -> x - elem(assignedtask, 0) end)
 
     {:reply, state, state}
   end
 
   def handle_call(:get_tasklist, _from, state) do
-    tasklist = state
+    tasklist =
+      state
       |> Map.fetch(:tasks)
       |> elem(1)
+
     {:reply, tasklist, state}
   end
 
   def handle_call({:is_assignment_valid?, i}, _from, state) do
-    pid = state
+    pid =
+      state
       |> Map.keys()
       |> Enum.at(rem(i, 5) + 2)
 
-    tasklist = state
+    tasklist =
+      state
       |> Map.fetch(:tasks)
       |> elem(1)
 
-    {assignedtask,tasklist} = List.pop_at(tasklist,0)
+    {assignedtask, tasklist} = List.pop_at(tasklist, 0)
 
-    {:reply, elem(assignedtask,0) <= Map.get(state,pid), state}
+    {:reply, elem(assignedtask, 0) <= Map.get(state, pid), state}
   end
 
   def handle_call({:assign_tasks_roundrobin, i}, _from, state) do
-
-    assignmap = state
+    assignmap =
+      state
       |> Map.fetch(:assignmap)
       |> elem(1)
 
-    pid = state
+    pid =
+      state
       |> Map.keys()
       |> Enum.at(rem(i, 5) + 2)
-    #IO.inspect pid
 
-    tasklist = state
+    # IO.inspect pid
+
+    tasklist =
+      state
       |> Map.fetch(:tasks)
       |> elem(1)
-    {assignedtask,tasklist} = List.pop_at(tasklist,0)
-    #IO.inspect {assignedtask,tasklist}
+
+    {assignedtask, tasklist} = List.pop_at(tasklist, 0)
+    # IO.inspect {assignedtask,tasklist}
 
     assignmap = Map.update(assignmap, pid, [], fn nowtasks -> nowtasks ++ [assignedtask] end)
     state = %{state | tasks: tasklist}
     state = %{state | assignmap: assignmap}
-    state = Map.update(state, pid, [], fn x -> x - elem(assignedtask,0) end)
+    state = Map.update(state, pid, [], fn x -> x - elem(assignedtask, 0) end)
 
     {:reply, state, state}
   end
 
-  def handle_call({:initialize_assignmap,id}, _from, state) do
-    assignmap = Map.get(state,:assignmap)
-    assignmap = Map.update(assignmap, Enum.at(Map.keys(state),id), [], fn nowtasks -> [] end)
+  def handle_call({:initialize_assignmap, id}, _from, state) do
+    assignmap = Map.get(state, :assignmap)
+    assignmap = Map.update(assignmap, Enum.at(Map.keys(state), id), [], fn nowtasks -> [] end)
     state = %{state | assignmap: assignmap}
     {:reply, state, state}
   end
 
   def handle_call(:let_workers_deal_tasks, _from, state) do
     for times <- 2..6 do
-      #GenServer.cast(Enum.at(Map.keys(state),times),{:do_tasks, Map.get(state,:assignmap)})
-      GenServer.cast(Enum.at(Map.keys(state),times),{:do_tasks, Map.get(state,:assignmap)})
+      # GenServer.cast(Enum.at(Map.keys(state),times),{:do_tasks, Map.get(state,:assignmap)})
+      GenServer.cast(Enum.at(Map.keys(state), times), {:do_tasks, Map.get(state, :assignmap)})
     end
+
     {:reply, state, state}
   end
 
-  #Client API
+  # Client API
   def start_link(state \\ %{}) do
     GenServer.start_link(__MODULE__, state, name: Server)
+
     for times <- 0..4 do
-      {:ok, pid} = TinkerBellSimWorker.start_link(%{calcpower: 1000 * (times+1)})
+      {:ok, pid} = TinkerBellSimWorker.start_link(%{calcpower: 1000 * (times + 1)})
       GenServer.call(pid, :create_tasklist)
-      GenServer.call(Server, {:append_workerinfo, pid, 1000 * (times+1)})
+      GenServer.call(Server, {:append_workerinfo, pid, 1000 * (times + 1)})
     end
 
-    GenServer.call(Server,:create_assignmap_and_tasks)
-    GenServer.call(Server,:getstate)
-
+    GenServer.call(Server, :create_assignmap_and_tasks)
+    GenServer.call(Server, :getstate)
   end
 
   def startworkterm(algo \\ :maxgreedy) do
     for times <- 2..6 do
-      GenServer.call(Server,{:update_worker_state, times})
+      GenServer.call(Server, {:update_worker_state, times})
     end
-    IO.inspect GenServer.call(Server,:getstate)
 
-    TinkerBellSimServer.create_tasks
-    IO.inspect GenServer.call(Server,:getstate)
+    IO.inspect(GenServer.call(Server, :getstate))
+
+    TinkerBellSimServer.create_tasks()
+    IO.inspect(GenServer.call(Server, :getstate))
     TinkerBellSimServer.assign_tasks(algo)
-    IO.inspect GenServer.call(Server,:getstate)
-    TinkerBellSimServer.deal_tasks
-    #IO.inspect GenServer.call(Server,:getstate)
-
+    IO.inspect(GenServer.call(Server, :getstate))
+    TinkerBellSimServer.deal_tasks()
+    # IO.inspect GenServer.call(Server,:getstate)
   end
 
   def create_tasks do
-    GenServer.call(Server,:let_workers_create_newtask)
+    GenServer.call(Server, :let_workers_create_newtask)
+
     for times <- 2..6 do
-      GenServer.call(Server,{:update_worker_state, times})
+      GenServer.call(Server, {:update_worker_state, times})
     end
-    GenServer.call(Server,:getstate)
+
+    GenServer.call(Server, :getstate)
   end
 
   def assign_tasks(algo) do
-
     for times <- 2..6 do
       GenServer.call(Server, {:initialize_assignmap, times})
     end
 
-    assign_iteration = GenServer.call(Server,:get_tasklist_length)
+    assign_iteration = GenServer.call(Server, :get_tasklist_length)
 
     case algo do
       :maxgreedy ->
-        for times <- 0..assign_iteration - 1 do
-          GenServer.call(Server,:assign_tasks_maxgreedy)
+        for times <- 0..(assign_iteration - 1) do
+          GenServer.call(Server, :assign_tasks_maxgreedy)
         end
+
       :mingreedy ->
-        for times <- 0..assign_iteration - 1 do
-          GenServer.call(Server,:assign_tasks_mingreedy)
+        for times <- 0..(assign_iteration - 1) do
+          GenServer.call(Server, :assign_tasks_mingreedy)
         end
+
       :roundrobin ->
-        for times <- 0..assign_iteration * 5 do
-          tasklist = GenServer.call(Server,:get_tasklist)
+        for times <- 0..(assign_iteration * 5) do
+          tasklist = GenServer.call(Server, :get_tasklist)
+
           if tasklist != [] do
-            flag = GenServer.call(Server,{:is_assignment_valid?, times})
-            IO.inspect flag
+            flag = GenServer.call(Server, {:is_assignment_valid?, times})
+            IO.inspect(flag)
+
             if flag == true do
-              GenServer.call(Server,{:assign_tasks_roundrobin, times})
+              GenServer.call(Server, {:assign_tasks_roundrobin, times})
             end
           end
         end
     end
 
-    GenServer.call(Server,:getstate)
-
+    GenServer.call(Server, :getstate)
   end
 
   def deal_tasks do
-    GenServer.call(Server,:let_workers_deal_tasks)
+    GenServer.call(Server, :let_workers_deal_tasks)
   end
-
 end
 
-#commit comment
+# commit comment
