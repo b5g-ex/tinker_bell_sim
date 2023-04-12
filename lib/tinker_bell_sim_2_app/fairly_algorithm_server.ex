@@ -7,16 +7,18 @@ defmodule FAServer do
   end
 
   def handle_call(:get_relaymap, _from, state) do
-    {:reply, state, state}
+    {:reply, state.relaymap, state}
   end
 
   def handle_call({:append_relayinfo, pid, relayinfo}, _from, state) do
-    state = Map.put_new(state, pid, relayinfo)
+    relaymap = Map.get(state, :relaymap, %{})
+    relaymap = Map.put_new(relaymap, pid, relayinfo)
+    state = Map.update(state, :relaymap, relaymap, fn _ -> relaymap end)
     {:reply, state, state}
   end
 
   def handle_call({:append_relaynetwork_feature_table, relaynetworkseed}, _from, state) do
-    relaypids = Map.keys(state)
+    relaypids = Map.keys(state.relaymap)
 
     _ = :rand.seed(:exsss, relaynetworkseed)
 
@@ -84,17 +86,11 @@ defmodule FAServer do
 
   def handle_cast({:initialize_creating_task_flag, initial_flag}, state) do
     relay_handling_task_flag =
-      state
-      |> Map.delete(:relaynetwork_bandwidth)
-      |> Map.delete(:relaynetwork_delay)
-      |> Map.delete(:tasknum)
-      |> Map.delete(:tasknumlimit)
-      |> Map.delete(:creating_task_flag)
-      |> Map.delete(:costmodel)
+      state.relaymap
       |> Map.keys()
       |> Enum.reduce(%{}, fn relaypid, acc ->
         devicemap =
-          state
+          state.relaymap
           |> Map.get(relaypid)
           |> Map.get(:devicemap)
 
@@ -136,13 +132,7 @@ defmodule FAServer do
 
           "responsetime" ->
             min_cluster_responsetime_in_cluster =
-              state
-              |> Map.delete(:relaynetwork_bandwidth)
-              |> Map.delete(:relaynetwork_delay)
-              |> Map.delete(:tasknum)
-              |> Map.delete(:tasknumlimit)
-              |> Map.delete(:creating_task_flag)
-              |> Map.delete(:costmodel)
+              state.relaymap
               |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
               |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time)} end)
               |> Enum.map(fn {key, val} -> {key, elem(val, 0)} end)
@@ -166,13 +156,7 @@ defmodule FAServer do
     case task.algo do
       "taskque" ->
         clustermap =
-          state
-          |> Map.delete(:relaynetwork_bandwidth)
-          |> Map.delete(:relaynetwork_delay)
-          |> Map.delete(:tasknum)
-          |> Map.delete(:tasknumlimit)
-          |> Map.delete(:creating_task_flag)
-          |> Map.delete(:costmodel)
+          state.relaymap
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
 
         cluster_taskque_num =
@@ -198,14 +182,18 @@ defmodule FAServer do
           |> elem(0)
 
         # algoserver内のcluster_taskqueを更新
-        old_relayinfo = Map.get(state, min_taskque_cluster_pid)
+        old_relayinfo = Map.get(state.relaymap, min_taskque_cluster_pid)
 
         new_clusterinfo =
           old_relayinfo.clusterinfo
           |> Map.update!(:cluster_taskque, fn pre -> pre ++ [task.flo] end)
 
         new_relayinfo = Map.update!(old_relayinfo, :clusterinfo, fn _ -> new_clusterinfo end)
-        state = Map.update!(state, min_taskque_cluster_pid, fn _ -> new_relayinfo end)
+
+        new_relaymap =
+          Map.update!(state.relaymap, min_taskque_cluster_pid, fn _ -> new_relayinfo end)
+
+        state = Map.update!(state, :relaymap, fn _ -> new_relaymap end)
 
         # デバッグ用標準出力↓
         # clustermap = state
@@ -223,13 +211,7 @@ defmodule FAServer do
 
         # IO.inspect(min_taskque_cluster_pid, label: "assigned cluster")
         if state.tasknum == state.tasknumlimit do
-          state
-          |> Map.delete(:relaynetwork_bandwidth)
-          |> Map.delete(:relaynetwork_delay)
-          |> Map.delete(:tasknum)
-          |> Map.delete(:tasknumlimit)
-          |> Map.delete(:creating_task_flag)
-          |> Map.delete(:costmodel)
+          state.relaymap
           |> Map.keys()
           |> Enum.map(fn pid ->
             GenServer.cast(pid, :stop_assigning)
@@ -276,13 +258,7 @@ defmodule FAServer do
           end)
 
         relaypids =
-          state
-          |> Map.delete(:relaynetwork_bandwidth)
-          |> Map.delete(:relaynetwork_delay)
-          |> Map.delete(:tasknum)
-          |> Map.delete(:tasknumlimit)
-          |> Map.delete(:creating_task_flag)
-          |> Map.delete(:costmodel)
+          state.relaymap
           |> Map.keys()
 
         noengine_relaypids =
@@ -324,13 +300,7 @@ defmodule FAServer do
 
         # IO.inspect(min_delay_cluster_pid, label: "assigned cluster")
         if state.tasknum == state.tasknumlimit do
-          state
-          |> Map.delete(:relaynetwork_bandwidth)
-          |> Map.delete(:relaynetwork_delay)
-          |> Map.delete(:tasknum)
-          |> Map.delete(:tasknumlimit)
-          |> Map.delete(:creating_task_flag)
-          |> Map.delete(:costmodel)
+          state.relaymap
           |> Map.keys()
           |> Enum.map(fn pid ->
             GenServer.cast(pid, :stop_assigning)
@@ -370,13 +340,7 @@ defmodule FAServer do
 
         # IO.inspect(max_bandwidth_cluster_pid, label: "assigned cluster")
         if state.tasknum == state.tasknumlimit do
-          state
-          |> Map.delete(:relaynetwork_bandwidth)
-          |> Map.delete(:relaynetwork_delay)
-          |> Map.delete(:tasknum)
-          |> Map.delete(:tasknumlimit)
-          |> Map.delete(:creating_task_flag)
-          |> Map.delete(:costmodel)
+          state.relaymap
           |> Map.keys()
           |> Enum.map(fn pid -> GenServer.cast(pid, :stop_assigning) end)
         end
@@ -405,13 +369,7 @@ defmodule FAServer do
 
       "responsetime" ->
         cluster_responsetime_in_cluster =
-          state
-          |> Map.delete(:relaynetwork_bandwidth)
-          |> Map.delete(:relaynetwork_delay)
-          |> Map.delete(:tasknum)
-          |> Map.delete(:tasknumlimit)
-          |> Map.delete(:creating_task_flag)
-          |> Map.delete(:costmodel)
+          state.relaymap
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :cluster_response_time)} end)
 
@@ -469,13 +427,7 @@ defmodule FAServer do
         # デバッグ用標準出力↑
 
         if state.tasknum == state.tasknumlimit do
-          state
-          |> Map.delete(:relaynetwork_bandwidth)
-          |> Map.delete(:relaynetwork_delay)
-          |> Map.delete(:tasknum)
-          |> Map.delete(:tasknumlimit)
-          |> Map.delete(:creating_task_flag)
-          |> Map.delete(:costmodel)
+          state.relaymap
           |> Map.keys()
           |> Enum.map(fn pid -> GenServer.cast(pid, :stop_assigning) end)
         end
@@ -489,13 +441,7 @@ defmodule FAServer do
 
       "clusterfee" ->
         cluster_fee_and_magnification =
-          state
-          |> Map.delete(:relaynetwork_bandwidth)
-          |> Map.delete(:relaynetwork_delay)
-          |> Map.delete(:tasknum)
-          |> Map.delete(:tasknumlimit)
-          |> Map.delete(:creating_task_flag)
-          |> Map.delete(:costmodel)
+          state.relaymap
           |> Enum.map(fn {key, val} -> {key, Map.get(val, :clusterinfo)} end)
           |> Enum.map(fn {key, val} ->
             {key, Map.get(val, :cluster_fee), Map.get(val, :cluster_fee_magnification)}
@@ -527,13 +473,7 @@ defmodule FAServer do
         # デバッグ用標準出力↑
 
         if state.tasknum == state.tasknumlimit do
-          state
-          |> Map.delete(:relaynetwork_bandwidth)
-          |> Map.delete(:relaynetwork_delay)
-          |> Map.delete(:tasknum)
-          |> Map.delete(:tasknumlimit)
-          |> Map.delete(:creating_task_flag)
-          |> Map.delete(:costmodel)
+          state.relaymap
           |> Map.keys()
           |> Enum.map(fn pid -> GenServer.cast(pid, :stop_assigning) end)
         end
@@ -585,13 +525,7 @@ defmodule FAServer do
 
   def handle_cast(:wait_for_tasklists, state) do
     max_taskque_num =
-      state
-      |> Map.delete(:relaynetwork_bandwidth)
-      |> Map.delete(:relaynetwork_delay)
-      |> Map.delete(:tasknum)
-      |> Map.delete(:tasknumlimit)
-      |> Map.delete(:creating_task_flag)
-      |> Map.delete(:costmodel)
+      state.relaymap
       |> Enum.map(fn {_, val} -> Map.get(val, :clusterinfo) end)
       |> Enum.map(fn clusterinfo -> Map.get(clusterinfo, :cluster_taskque) end)
       |> Enum.map(fn cluster_taskque ->
@@ -690,13 +624,7 @@ defmodule FAServer do
     GenServer.cast(AlgoServer, :initialize_tasknum)
 
     relaypids =
-      state
-      |> Map.delete(:relaynetwork_bandwidth)
-      |> Map.delete(:relaynetwork_delay)
-      |> Map.delete(:tasknum)
-      |> Map.delete(:tasknumlimit)
-      |> Map.delete(:creating_task_flag)
-      |> Map.delete(:costmodel)
+      state.relaymap
       |> Map.keys()
 
     Enum.map(relaypids, fn relaypid ->
@@ -711,8 +639,8 @@ defmodule FAServer do
   end
 
   def handle_cast({:update_relaymap, relaypid, new_relayinfo}, state) do
-    state = Map.update!(state, relaypid, fn _ -> new_relayinfo end)
-    {:noreply, state}
+    new_relaymap = Map.update!(state.relaymap, relaypid, fn _ -> new_relayinfo end)
+    {:noreply, %{state | relaymap: new_relaymap}}
   end
 
   # Client API
