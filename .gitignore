@@ -24,3 +24,7 @@ tinker_bell_sim-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+/data/
+
+tinker_bell_sim
