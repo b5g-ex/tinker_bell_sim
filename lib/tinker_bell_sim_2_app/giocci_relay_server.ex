@@ -108,26 +108,28 @@ defmodule GRServer do
         {:send_task_response_time_in_cluster, processed_task, task_response_time_in_cluster},
         state
       ) do
+    data_dir = GenServer.call(AlgoServer, :get_data_dir)
+
     File.write(
-      "responsetime_in_cluster.txt",
+      data_dir <> "responsetime_in_cluster.txt",
       Float.to_string(task_response_time_in_cluster) <> "\n",
       [:append]
     )
 
     File.write(
-      "clusterfee.txt",
+      data_dir <> "clusterfee.txt",
       Float.to_string(elem(processed_task, 0) * elem(processed_task, 3) / 1000) <> "\n",
       [:append]
     )
 
     File.write(
-      "responsetime_in_cluster_mem.txt",
+      data_dir <> "responsetime_in_cluster_mem.txt",
       Float.to_string(task_response_time_in_cluster) <> "\n",
       [:append]
     )
 
     File.write(
-      "clusterfee_mem.txt",
+      data_dir <> "clusterfee_mem.txt",
       Float.to_string(elem(processed_task, 0) * elem(processed_task, 3) / 1000) <> "\n",
       [:append]
     )
@@ -202,8 +204,17 @@ defmodule GRServer do
 
     task_processed_time = :erlang.monotonic_time()
     task_responsetime = (task_processed_time - elem(processed_task, 1)) / :math.pow(10, 6)
-    File.write("responsetime.txt", Float.to_string(task_responsetime) <> "\n", [:append])
-    File.write("responsetime_mem.txt", Float.to_string(task_responsetime) <> "\n", [:append])
+
+    data_dir = GenServer.call(AlgoServer, :get_data_dir)
+
+    File.write(data_dir <> "responsetime.txt", Float.to_string(task_responsetime) <> "\n", [
+      :append
+    ])
+
+    File.write(data_dir <> "responsetime_mem.txt", Float.to_string(task_responsetime) <> "\n", [
+      :append
+    ])
+
     {:noreply, state}
   end
 
@@ -247,14 +258,16 @@ defmodule GRServer do
       GenServer.call(AlgoServer, {:assign_algorithm, self(), task})
 
     if rtr_delay != "tasknumlimit" do
+      data_dir = GenServer.call(AlgoServer, :get_data_dir)
+
       File.write(
-        "RtRDelay.txt",
+        data_dir <> "RtRDelay.txt",
         Integer.to_string(elem(rtr_delay, 0) + elem(rtr_delay, 1)) <> "\n",
         [:append]
       )
 
       File.write(
-        "RtRDelay_mem.txt",
+        data_dir <> "RtRDelay_mem.txt",
         Integer.to_string(elem(rtr_delay, 0) + elem(rtr_delay, 1)) <> "\n",
         [:append]
       )

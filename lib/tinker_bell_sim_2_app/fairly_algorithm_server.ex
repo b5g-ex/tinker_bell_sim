@@ -554,7 +554,8 @@ defmodule FAServer do
   end
 
   def handle_cast(:initialize_parameters, state) do
-    {:ok, strdat} = File.read("responsetime_in_cluster_mem.txt")
+    data_dir = GenServer.call(AlgoServer, :get_data_dir)
+    {:ok, strdat} = File.read(data_dir <> "responsetime_in_cluster_mem.txt")
 
     floatdat =
       strdat
@@ -564,32 +565,39 @@ defmodule FAServer do
 
     average_restime = Enum.sum(floatdat) / length(floatdat)
 
-    File.write("responsetime_in_cluster_average.txt", Float.to_string(average_restime) <> "\n", [
+    File.write(
+      data_dir <> "responsetime_in_cluster_average.txt",
+      Float.to_string(average_restime) <> "\n",
+      [
+        :append
+      ]
+    )
+
+    {:ok, strdat} = File.read(data_dir <> "responsetime_mem.txt")
+
+    floatdat =
+      strdat
+      |> String.split("\n")
+      |> List.delete("")
+      |> Enum.map(fn x -> elem(Float.parse(x), 0) end)
+
+    average_restime = Enum.sum(floatdat) / length(floatdat)
+
+    File.write(data_dir <> "responsetime_average.txt", Float.to_string(average_restime) <> "\n", [
       :append
     ])
 
-    {:ok, strdat} = File.read("responsetime_mem.txt")
-
-    floatdat =
-      strdat
-      |> String.split("\n")
-      |> List.delete("")
-      |> Enum.map(fn x -> elem(Float.parse(x), 0) end)
-
-    average_restime = Enum.sum(floatdat) / length(floatdat)
-    File.write("responsetime_average.txt", Float.to_string(average_restime) <> "\n", [:append])
-
     """
-    {:ok, strdat} = File.read("clusterfee.txt")
+    {:ok, strdat} = File.read(data_dir <> "clusterfee.txt")
     floatdat = strdat
       |> String.split("\n")
       |> List.delete("")
       |> Enum.map(fn x -> elem(Float.parse(x),0) end)
     sum_clusterfee = Enum.sum(floatdat)
-    File.write("clusterfee_average.txt",Float.to_string(sum_clusterfee) <> "\n",[:append])
+    File.write(data_dir <> "clusterfee_average.txt",Float.to_string(sum_clusterfee) <> "\n",[:append])
     """
 
-    {:ok, strdat} = File.read("clusterfee_mem.txt")
+    {:ok, strdat} = File.read(data_dir <> "clusterfee_mem.txt")
 
     floatdat =
       strdat
@@ -598,9 +606,12 @@ defmodule FAServer do
       |> Enum.map(fn x -> elem(Float.parse(x), 0) end)
 
     sum_clusterfee = Enum.sum(floatdat)
-    File.write("clusterfee_sum.txt", Float.to_string(sum_clusterfee) <> "\n", [:append])
 
-    {:ok, strdat} = File.read("RtRDelay_mem.txt")
+    File.write(data_dir <> "clusterfee_sum.txt", Float.to_string(sum_clusterfee) <> "\n", [
+      :append
+    ])
+
+    {:ok, strdat} = File.read(data_dir <> "RtRDelay_mem.txt")
 
     floatdat =
       strdat
@@ -609,16 +620,19 @@ defmodule FAServer do
       |> Enum.map(fn x -> elem(Integer.parse(x), 0) end)
 
     average_rtrdelay = Enum.sum(floatdat) / length(floatdat)
-    File.write("RtRDelay_average.txt", Float.to_string(average_rtrdelay) <> "\n", [:append])
 
-    File.write("responsetime_in_cluster_mem.txt", "")
-    File.write("responsetime_mem.txt", "")
-    File.write("clusterfee_mem.txt", "")
-    File.write("RtRDelay_mem.txt", "")
-    File.write("responsetime_in_cluster.txt", "\n\n\n\n\n", [:append])
-    File.write("responsetime.txt", "\n\n\n\n\n", [:append])
-    File.write("clusterfee.txt", "\n\n\n\n\n", [:append])
-    File.write("RtRDelay.txt", "\n\n\n\n\n", [:append])
+    File.write(data_dir <> "RtRDelay_average.txt", Float.to_string(average_rtrdelay) <> "\n", [
+      :append
+    ])
+
+    File.write(data_dir <> "responsetime_in_cluster_mem.txt", "")
+    File.write(data_dir <> "responsetime_mem.txt", "")
+    File.write(data_dir <> "clusterfee_mem.txt", "")
+    File.write(data_dir <> "RtRDelay_mem.txt", "")
+    File.write(data_dir <> "responsetime_in_cluster.txt", "\n\n\n\n\n", [:append])
+    File.write(data_dir <> "responsetime.txt", "\n\n\n\n\n", [:append])
+    File.write(data_dir <> "clusterfee.txt", "\n\n\n\n\n", [:append])
+    File.write(data_dir <> "RtRDelay.txt", "\n\n\n\n\n", [:append])
 
     # パラメータを初期化して次の実験へ
     GenServer.cast(AlgoServer, :initialize_tasknum)
@@ -643,22 +657,45 @@ defmodule FAServer do
     {:noreply, %{state | relaymap: new_relaymap}}
   end
 
+  def handle_call(:create_data_dir, _from, state) do
+    now =
+      DateTime.utc_now()
+      |> DateTime.to_string()
+      |> String.replace(" ", "_")
+      |> String.replace(":", "")
+      |> String.replace(".", "_")
+
+    dir_name = "data/" <> now <> "/"
+    File.mkdir_p(dir_name)
+    new_state = Map.put_new(state, :data_dir, dir_name)
+    {:reply, :ok, new_state}
+  end
+
+  def handle_call(:get_data_dir, _from, state) do
+    {:reply, state.data_dir, state}
+  end
+
   # Client API
   def start_link([taskseed, engineseed, tasknumlimit]) do
-    File.write("responsetime_in_cluster.txt", "")
-    File.write("responsetime.txt", "")
-    File.write("clusterfee.txt", "")
-    File.write("RtRDelay.txt", "")
+    {:ok, pid} = GenServer.start_link(__MODULE__, %{}, name: AlgoServer)
 
-    File.write("responsetime_in_cluster_mem.txt", "")
-    File.write("responsetime_mem.txt", "")
-    File.write("clusterfee_mem.txt", "")
-    File.write("RtRDelay_mem.txt", "")
+    GenServer.call(AlgoServer, :create_data_dir)
+    data_dir = GenServer.call(AlgoServer, :get_data_dir)
 
-    File.write("responsetime_in_cluster_average.txt", "")
-    File.write("responsetime_average.txt", "")
-    File.write("clusterfee_sum.txt", "")
-    File.write("RtRDelay_average.txt", "")
+    File.write(data_dir <> "responsetime_in_cluster.txt", "")
+    File.write(data_dir <> "responsetime.txt", "")
+    File.write(data_dir <> "clusterfee.txt", "")
+    File.write(data_dir <> "RtRDelay.txt", "")
+
+    File.write(data_dir <> "responsetime_in_cluster_mem.txt", "")
+    File.write(data_dir <> "responsetime_mem.txt", "")
+    File.write(data_dir <> "clusterfee_mem.txt", "")
+    File.write(data_dir <> "RtRDelay_mem.txt", "")
+
+    File.write(data_dir <> "responsetime_in_cluster_average.txt", "")
+    File.write(data_dir <> "responsetime_average.txt", "")
+    File.write(data_dir <> "clusterfee_sum.txt", "")
+    File.write(data_dir <> "RtRDelay_average.txt", "")
 
     costmodel = {1.0, 10.0}
 
@@ -688,8 +725,6 @@ defmodule FAServer do
         {engine, device, flopsflag, devicerandomseed, :rand.uniform(1_000_000)}
       end)
 
-    GenServer.start_link(__MODULE__, %{}, name: AlgoServer)
-
     Enum.map(relayrandomseed, fn seed ->
       {:ok, pid} = GRServer.start_link(seed, costmodel)
       relayinfo = GenServer.call(pid, :get_relayinfo)
@@ -704,6 +739,7 @@ defmodule FAServer do
     GenServer.cast(AlgoServer, {:append_costmodel, costmodel})
     IO.inspect(GenServer.call(AlgoServer, :get_relaymap))
     IO.inspect(relayrandomseed)
+    {:ok, pid}
   end
 
   def start_assigning() do
