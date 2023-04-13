@@ -682,6 +682,8 @@ defmodule FAServer do
     GenServer.call(AlgoServer, :create_data_dir)
     data_dir = GenServer.call(AlgoServer, :get_data_dir)
 
+    File.write(data_dir <> "parameter.txt", "#{taskseed}, #{engineseed}, #{tasknumlimit}")
+
     File.write(data_dir <> "responsetime_in_cluster.txt", "")
     File.write(data_dir <> "responsetime.txt", "")
     File.write(data_dir <> "clusterfee.txt", "")
